@@ -18,10 +18,7 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 
-dependencies = [
-  'loguru>=0.7.0',
-  'fasm>=0.0.2',
-]
+dependencies = ['loguru>=0.7.0', 'fasm>=0.0.2']
 
 [project.urls]
 Repository = "https://github.com/FPGA-Research/FABulous"
@@ -39,3 +36,7 @@ include = ["fabulous_bit_gen*"]
 
 [tool.setuptools.package-data]
 fabulous_bit_gen = ["**/*"]
+
+
+[dependency-groups]
+dev = ["pre-commit>=4.2.0", "ruff>=0.12.7"]
