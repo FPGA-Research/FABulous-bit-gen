@@ -17,7 +17,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from fabulous_bit_gen.custom_exception import SpecMissMatch
+from FABulous_bit_gen.custom_exception import SpecMissMatch
 
 try:
     from fasm import (
@@ -159,7 +159,7 @@ def genBitstream(fasmFile: str, specFile: str, bitstreamFile: str) -> None:
         vhdl_str += '";\n'
     vhdl_str += "end package emulate_bitstream;"
 
-    # Top/bottom rows have no bitstream content (hardcoded throughout fabulous)
+    # Top/bottom rows have no bitstream content (hardcoded throughout FABulous)
     # reversed row order
     for y in range(num_rows - 2, 0, -1):
         for x in range(num_columns):

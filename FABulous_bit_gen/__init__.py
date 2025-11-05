@@ -5,6 +5,6 @@ files for FABulous FPGA fabrics. It handles the conversion of place-and-route re
 into configuration bitstreams that can be loaded onto the FPGA fabric.
 """
 
-from fabulous_bit_gen.bit_gen import bitstring_to_bytes, genBitstream
+from FABulous_bit_gen.bit_gen import bitstring_to_bytes, genBitstream
 
 __all__ = ["genBitstream", "bitstring_to_bytes"]
