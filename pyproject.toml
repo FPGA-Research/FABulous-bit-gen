@@ -25,17 +25,17 @@ Repository = "https://github.com/FPGA-Research/FABulous"
 Documentation = "https://fabulous.readthedocs.io"
 
 [project.scripts]
-bit_gen = "fabulous_bit_gen.bit_gen:bit_gen"
+bit_gen = "FABulous_bit_gen.bit_gen:bit_gen"
 
 [tool.setuptools_scm]
 version_scheme = "guess-next-dev"
 local_scheme = "node-and-date"
 
 [tool.setuptools.packages.find]
-include = ["fabulous_bit_gen*"]
+include = ["FABulous_bit_gen*"]
 
 [tool.setuptools.package-data]
-fabulous_bit_gen = ["**/*"]
+FABulous_bit_gen = ["**/*"]
 
 
 [dependency-groups]

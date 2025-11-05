@@ -19,7 +19,7 @@ into configuration bitstreams that can be loaded onto the FPGA fabric.
 ## Installation
 
 ```bash
-pip install fabulous-bit-gen
+pip install FABulous-bit-gen
 ```
 
 ## Usage
@@ -33,7 +33,7 @@ bit_gen -genBitstream input.fasm spec.pkl output.bin
 ### Python API
 
 ```python
-from fabulous_bit_gen import genBitstream
+from FABulous_bit_gen import genBitstream
 
 genBitstream("input.fasm", "spec.pkl", "output.bin")
 ```
