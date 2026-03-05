@@ -54,7 +54,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fasm", specifier = ">=0.0.2" },
+    { name = "fasm", git = "https://github.com/FPGA-Research/fasm.git" },
     { name = "loguru", specifier = ">=0.7.0" },
 ]
 
@@ -66,12 +66,11 @@ dev = [
 
 [[package]]
 name = "fasm"
-version = "0.0.2.post88"
-source = { registry = "https://pypi.org/simple" }
+version = "0.1.dev159+g67cdfbae9"
+source = { git = "https://github.com/FPGA-Research/fasm.git#67cdfbae9f3fe07cc73ce3003f0009cb62355b77" }
 dependencies = [
     { name = "textx" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/78/4c/94fb3bdb87bea21406c0e5da375f0b10d7b1e4b5103cea453a2de23b5d61/fasm-0.0.2.post88.tar.gz", hash = "sha256:049d79dd26f584083b222fad3866a2a3430f8c5bae0d42ae568e8227d8390c3c", size = 84597, upload-time = "2022-01-24T19:06:23.04Z" }
 
 [[package]]
 name = "filelock"

@@ -40,3 +40,6 @@ FABulous_bit_gen = ["**/*"]
 
 [dependency-groups]
 dev = ["pre-commit>=4.2.0", "ruff>=0.12.7"]
+
+[tool.uv.sources]
+fasm = { git = "https://github.com/FPGA-Research/fasm.git" }
