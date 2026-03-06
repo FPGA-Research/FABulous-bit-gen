@@ -18,7 +18,10 @@ classifiers = [
   "Operating System :: OS Independent",
 ]
 
-dependencies = ['loguru>=0.7.0', 'fasm>=0.0.2']
+dependencies = [
+  'loguru>=0.7.0',
+  'fasm @ git+https://github.com/FPGA-Research/fasm.git',
+]
 
 [project.urls]
 Repository = "https://github.com/FPGA-Research/FABulous"
