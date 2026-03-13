@@ -21,7 +21,7 @@ classifiers = [
 dependencies = ['loguru>=0.7.0', 'fasm>=0.0.2']
 
 [project.urls]
-Repository = "https://github.com/FPGA-Research/FABulous"
+Repository = "https://github.com/FPGA-Research/FABulous-bit-gen"
 Documentation = "https://fabulous.readthedocs.io"
 
 [project.scripts]
