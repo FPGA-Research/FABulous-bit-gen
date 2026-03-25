@@ -112,7 +112,7 @@ def genBitstream(fasmFile: str, specFile: str, bitstreamFile: str) -> None:
             else:
                 raise SpecMissMatch(
                     f"Tile type: {tileType}\n"
-                    "with location {tileLoc} and \n"
+                    f"with location {tileLoc} and \n"
                     f"Feature: {featureName}\n"
                     "found in fasm file was not found in the bitstream spec"
                 )
