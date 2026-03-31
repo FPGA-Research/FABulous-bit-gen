@@ -42,7 +42,7 @@ wheels = [
 name = "fabulous-bit-gen"
 source = { editable = "." }
 dependencies = [
-    { name = "fasm" },
+    { name = "fabulous-fasm" },
     { name = "loguru" },
 ]
 
@@ -54,7 +54,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "fasm", git = "https://github.com/FPGA-Research/fasm.git" },
+    { name = "fabulous-fasm", specifier = ">=0.2.0" },
     { name = "loguru", specifier = ">=0.7.0" },
 ]
 
@@ -65,11 +65,15 @@ dev = [
 ]
 
 [[package]]
-name = "fasm"
-version = "0.1.dev159+g67cdfbae9"
-source = { git = "https://github.com/FPGA-Research/fasm.git#67cdfbae9f3fe07cc73ce3003f0009cb62355b77" }
+name = "fabulous-fasm"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "textx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/62/865565db82da4fc627aa96d67f99a923b25181838b24f0d04a80acb8b455/fabulous_fasm-0.2.0.tar.gz", hash = "sha256:082c883615b1aef99c17c73e6b52593c716e233fff3088d2e5e5ef0eb8a05929", size = 78903, upload-time = "2026-03-31T13:35:33.958Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/e2/7e0491c5c2b07cfe60f7bccc30e2f10342bd8371f72b08accba9709de94b/fabulous_fasm-0.2.0-py3-none-any.whl", hash = "sha256:d9f0f24fb1158dcd7b57da62ba2478cf3a8323dbae83fe5d7bf3e05fac74bbf4", size = 72160, upload-time = "2026-03-31T13:35:32.652Z" },
 ]
 
 [[package]]
