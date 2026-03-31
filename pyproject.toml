@@ -39,7 +39,14 @@ FABulous_bit_gen = ["**/*"]
 
 
 [dependency-groups]
-dev = ["pre-commit>=4.2.0", "ruff>=0.12.7"]
+dev = ["pre-commit>=4.2.0", "ruff>=0.12.7", "pytest>=8.0.0", "pytest-mock>=3.14.0"]
 
 [tool.uv.sources]
 fasm = { git = "https://github.com/FPGA-Research/fasm.git" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
