@@ -10,9 +10,9 @@ The module includes functions for parsing FASM files, processing configuration b
 generating the final bitstream output in various formats.
 """
 
+import argparse
 import pickle
 import re
-import sys
 from pathlib import Path
 
 from loguru import logger
@@ -241,51 +241,27 @@ def genBitstream(fasmFile: str, specFile: str, bitstreamFile: str) -> None:
 # Main
 #####################################################################################
 def bit_gen() -> None:
-    """Command-line entry point for bitstream generation.
+    """Command-line entry point for bitstream generation."""
+    parser = argparse.ArgumentParser(
+        prog="bit_gen",
+        description="FABulous bitstream generation tool",
+    )
+    subparsers = parser.add_subparsers(dest="command")
 
-    Parses command-line arguments and calls genBitstream to create bitstream files from
-    FASM and specification inputs.
-    """
-    # Strip arguments
-    caseProcessedArguments = list(map(lambda x: x.strip(), sys.argv))
-    processedArguments = list(map(lambda x: x.lower(), caseProcessedArguments))
-    flagRE = re.compile(r"-\S*")
-    if "-genBitstream".lower() in str(sys.argv).lower():
-        argIndex = processedArguments.index("-genBitstream".lower())
-        if len(processedArguments) <= argIndex + 3:
-            logger.error(
-                "genBitstream expects three file names - the fasm file, the spec file "
-                "and the output file"
-            )
-            raise ValueError
-        if (
-            flagRE.match(caseProcessedArguments[argIndex + 1])
-            or flagRE.match(caseProcessedArguments[argIndex + 2])
-            or flagRE.match(caseProcessedArguments[argIndex + 3])
-        ):
-            logger.error(
-                "genBitstream expects three file names, but"
-                " found a flag in the arguments: "
-                f"{caseProcessedArguments[argIndex + 1]}, "
-                f"{caseProcessedArguments[argIndex + 2]}, "
-                f"{caseProcessedArguments[argIndex + 3]}"
-            )
-            raise ValueError
+    gen_parser = subparsers.add_parser(
+        "genBitstream",
+        help="Generate a bitstream from a FASM file and bitstream spec",
+    )
+    gen_parser.add_argument("fasm_file", help="Path to the FASM file")
+    gen_parser.add_argument("spec_file", help="Path to the bitstream spec file")
+    gen_parser.add_argument("output_file", help="Path to write the output bitstream")
 
-        FasmFileName = caseProcessedArguments[argIndex + 1]
-        SpecFileName = caseProcessedArguments[argIndex + 2]
-        OutFileName = caseProcessedArguments[argIndex + 3]
+    args = parser.parse_args()
 
-        genBitstream(FasmFileName, SpecFileName, OutFileName)
-
-    if ("-help".lower() in str(sys.argv).lower()) or ("-h" in str(sys.argv).lower()):
-        logger.info("Help:")
-        logger.info("Options/Switches")
-        logger.info(
-            "  -genBitstream foo.fasm spec.txt bitstream.txt - generates a bitstream - "
-            "the first file is the fasm file, the second is the bitstream spec and "
-            "the third is the fasm file to write to"
-        )
+    if args.command == "genBitstream":
+        genBitstream(args.fasm_file, args.spec_file, args.output_file)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
