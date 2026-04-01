@@ -121,9 +121,10 @@ def _apply_fasm_features(
     written into both ``tile_bits`` (masked) and ``tile_bits_no_mask``
     (unmasked) using the values stored in the spec.
 
-    A warning is emitted via ``logger.warning`` whenever a bit in
-    ``tile_bits`` that was already set to a non-zero value is overwritten,
-    indicating that two FASM features compete for the same configuration bit.
+    A warning is emitted via ``logger.warning`` whenever a bit that was
+    already written is overwritten, both for ``tile_bits`` (masked) and
+    ``tile_bits_no_mask`` (unmasked), indicating that two FASM features
+    compete for the same configuration bit.
 
     Parameters
     ----------
@@ -158,6 +159,7 @@ def _apply_fasm_features(
     # overwrites are detected regardless of the bit value (a feature can
     # legitimately map a bit to 0, making a value-based sentinel unreliable).
     touched_bits: dict[str, set] = {tile: set() for tile in tile_bits}
+    touched_bits_no_mask: dict[str, set] = {tile: set() for tile in tile_bits_no_mask}
 
     for line in canon_list:
         if not line.set_feature:
@@ -190,7 +192,16 @@ def _apply_fasm_features(
                     touched_bits[tile_loc].add(bit_idx)
                     tile_bits[tile_loc][bit_idx] = new_val
                 for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][feature_name].items():
-                    tile_bits_no_mask[tile_loc][bit_idx] = int(bit_val)
+                    new_val = int(bit_val)
+                    if bit_idx in touched_bits_no_mask[tile_loc]:
+                        logger.warning(
+                            f"Bit {bit_idx} of tile {tile_loc} is being overwritten "
+                            f"in the unmasked bitstream by feature {feature_name} "
+                            f"(old value: {tile_bits_no_mask[tile_loc][bit_idx]}, "
+                            f"new value: {new_val})"
+                        )
+                    touched_bits_no_mask[tile_loc].add(bit_idx)
+                    tile_bits_no_mask[tile_loc][bit_idx] = new_val
         else:
             raise SpecMissMatch(
                 f"Tile type: {tile_type}\n"

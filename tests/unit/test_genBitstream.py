@@ -483,7 +483,11 @@ class TestGenBitstreamFasmProcessing:
         return mock_logger
 
     def test_overlapping_features_emit_warning(self, temp_output_dir, mocker):
-        """Two features mapping to the same bit index should trigger a logger warning."""
+        """Two features mapping to the same bit index should trigger a logger warning.
+
+        Both TileSpecs (masked) and TileSpecs_No_Mask (unmasked) overlap at
+        bit 50, so two warnings are expected: one per bitstream.
+        """
         mock_logger = self._run_with_features(
             ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
             self._overlapping_spec(),
@@ -491,10 +495,11 @@ class TestGenBitstreamFasmProcessing:
             mocker,
         )
 
-        mock_logger.warning.assert_called_once()
-        warning_msg = mock_logger.warning.call_args[0][0]
-        assert "X0Y1" in warning_msg
-        assert "50" in warning_msg
+        assert mock_logger.warning.call_count == 2
+        for call in mock_logger.warning.call_args_list:
+            warning_msg = call[0][0]
+            assert "X0Y1" in warning_msg
+            assert "50" in warning_msg
 
     def test_overlapping_zero_valued_bit_emits_warning(self, temp_output_dir, mocker):
         """Overwrite of a zero-valued bit must still warn.
@@ -502,6 +507,7 @@ class TestGenBitstreamFasmProcessing:
         A feature can map a bit to value '0'. Since tile_bits is initialised
         to all zeros, a value-based sentinel (old != 0) would miss this case.
         The touched_bits tracker must detect it regardless of the stored value.
+        Both TileSpecs and TileSpecs_No_Mask overlap, so two warnings are expected.
         """
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -536,8 +542,101 @@ class TestGenBitstreamFasmProcessing:
             mocker,
         )
 
+        assert mock_logger.warning.call_count == 2
+        for call in mock_logger.warning.call_args_list:
+            warning_msg = call[0][0]
+            assert "X0Y1" in warning_msg
+            assert "50" in warning_msg
+
+    def test_no_mask_only_overlap_emits_one_warning(self, temp_output_dir, mocker):
+        """Overlap only in TileSpecs_No_Mask should warn exactly once (unmasked path).
+
+        TileSpecs (masked) maps each feature to a distinct bit, so no masked
+        warning fires.  TileSpecs_No_Mask maps both features to bit 50, which
+        triggers the unmasked overwrite warning.
+        """
+        spec_dict = {
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
+            "TileSpecs": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "1"},   # masked: distinct bits, no conflict
+                    "FEAT.B": {51: "1"},
+                },
+                "X0Y2": {},
+            },
+            "TileSpecs_No_Mask": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "1"},   # unmasked: both write to bit 50
+                    "FEAT.B": {50: "1"},
+                },
+                "X0Y2": {},
+            },
+            "FrameMap": {
+                "NULL": {},
+                "W_IO": {0: "11111111111111111111111111111111"},
+            },
+            "FrameMapEncode": {},
+        }
+
+        mock_logger = self._run_with_features(
+            ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
+            spec_dict,
+            temp_output_dir,
+            mocker,
+        )
+
         mock_logger.warning.assert_called_once()
         warning_msg = mock_logger.warning.call_args[0][0]
+        assert "unmasked" in warning_msg
+        assert "X0Y1" in warning_msg
+        assert "50" in warning_msg
+
+    def test_masked_only_overlap_emits_one_warning(self, temp_output_dir, mocker):
+        """Overlap only in TileSpecs (masked) should warn exactly once (masked path).
+
+        TileSpecs_No_Mask maps each feature to a distinct bit, so no unmasked
+        warning fires.  TileSpecs maps both features to bit 50, triggering the
+        masked overwrite warning.
+        """
+        spec_dict = {
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
+            "TileSpecs": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "1"},   # masked: both write to bit 50
+                    "FEAT.B": {50: "1"},
+                },
+                "X0Y2": {},
+            },
+            "TileSpecs_No_Mask": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "1"},   # unmasked: distinct bits, no conflict
+                    "FEAT.B": {51: "1"},
+                },
+                "X0Y2": {},
+            },
+            "FrameMap": {
+                "NULL": {},
+                "W_IO": {0: "11111111111111111111111111111111"},
+            },
+            "FrameMapEncode": {},
+        }
+
+        mock_logger = self._run_with_features(
+            ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
+            spec_dict,
+            temp_output_dir,
+            mocker,
+        )
+
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "unmasked" not in warning_msg
         assert "X0Y1" in warning_msg
         assert "50" in warning_msg
 
