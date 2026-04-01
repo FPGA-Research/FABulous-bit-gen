@@ -121,6 +121,10 @@ def _apply_fasm_features(
     written into both ``tile_bits`` (masked) and ``tile_bits_no_mask``
     (unmasked) using the values stored in the spec.
 
+    A warning is emitted via ``logger.warning`` whenever a bit in
+    ``tile_bits`` that was already set to a non-zero value is overwritten,
+    indicating that two FASM features compete for the same configuration bit.
+
     Parameters
     ----------
     canon_list : list[FasmLine]
@@ -169,7 +173,15 @@ def _apply_fasm_features(
         if feature_name in spec_dict["TileSpecs"][tile_loc]:
             if spec_dict["TileSpecs"][tile_loc][feature_name]:
                 for bit_idx, bit_val in spec_dict["TileSpecs"][tile_loc][feature_name].items():
-                    tile_bits[tile_loc][bit_idx] = int(bit_val)
+                    new_val = int(bit_val)
+                    if tile_bits[tile_loc][bit_idx] != 0:
+                        logger.warning(
+                            f"Bit {bit_idx} of tile {tile_loc} is being overwritten "
+                            f"by feature {feature_name} "
+                            f"(old value: {tile_bits[tile_loc][bit_idx]}, "
+                            f"new value: {new_val})"
+                        )
+                    tile_bits[tile_loc][bit_idx] = new_val
                 for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][feature_name].items():
                     tile_bits_no_mask[tile_loc][bit_idx] = int(bit_val)
         else:

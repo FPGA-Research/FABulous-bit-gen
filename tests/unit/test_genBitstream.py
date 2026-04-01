@@ -422,6 +422,83 @@ class TestGenBitstreamFasmProcessing:
         csv_content = csv_path.read_text()
         assert "frame0" in csv_content
 
+    def test_overlapping_features_emit_warning(self, temp_output_dir, mocker):
+        """Two features writing to the same bit index should trigger a logger warning."""
+        # Build a spec where FEAT_A and FEAT_B both map to bit index 50 of X0Y1.
+        spec_dict = {
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
+            "TileSpecs": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "1"},
+                    "FEAT.B": {50: "1"},
+                },
+                "X0Y2": {},
+            },
+            "TileSpecs_No_Mask": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "1"},
+                    "FEAT.B": {50: "1"},
+                },
+                "X0Y2": {},
+            },
+            "FrameMap": {
+                "NULL": {},
+                "W_IO": {0: "11111111111111111111111111111111"},
+            },
+            "FrameMapEncode": {},
+        }
+
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        fasm_lines = [
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.FEAT.A",
+                    start=None, end=None, value=1, value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            ),
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.FEAT.B",
+                    start=None, end=None, value=1, value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            ),
+        ]
+
+        with spec_file.open("wb") as f:
+            pickle.dump(spec_dict, f)
+
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            side_effect=lambda f: f.feature,
+        )
+        mock_logger = mocker.patch("FABulous_bit_gen.bit_gen.logger")
+
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "X0Y1" in warning_msg
+        assert "50" in warning_msg
+
 
 class TestGenBitstreamErrorHandling:
     """Tests for error handling in genBitstream."""
