@@ -422,10 +422,9 @@ class TestGenBitstreamFasmProcessing:
         csv_content = csv_path.read_text()
         assert "frame0" in csv_content
 
-    def test_overlapping_features_emit_warning(self, temp_output_dir, mocker):
-        """Two features writing to the same bit index should trigger a logger warning."""
-        # Build a spec where FEAT_A and FEAT_B both map to bit index 50 of X0Y1.
-        spec_dict = {
+    def _overlapping_spec(self):
+        """Shared spec for overwrite-warning tests: FEAT.A and FEAT.B both map to bit 50."""
+        return {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
             "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
             "TileSpecs": {
@@ -451,6 +450,8 @@ class TestGenBitstreamFasmProcessing:
             "FrameMapEncode": {},
         }
 
+    def _run_with_features(self, features, spec_dict, temp_output_dir, mocker):
+        """Helper: run genBitstream with a given list of feature strings and return mock_logger."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -458,34 +459,20 @@ class TestGenBitstreamFasmProcessing:
         fasm_lines = [
             FasmLine(
                 set_feature=SetFasmFeature(
-                    feature="X0Y1.FEAT.A",
-                    start=None, end=None, value=1, value_format=None,
+                    feature=f, start=None, end=None, value=1, value_format=None,
                 ),
                 annotations=None,
                 comment=None,
-            ),
-            FasmLine(
-                set_feature=SetFasmFeature(
-                    feature="X0Y1.FEAT.B",
-                    start=None, end=None, value=1, value_format=None,
-                ),
-                annotations=None,
-                comment=None,
-            ),
+            )
+            for f in features
         ]
 
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict, f)
 
-        mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
-        )
-        mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
-        )
-        mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
-        )
+        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines)
+        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical")
+        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines)
         mocker.patch(
             "FABulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=lambda f: f.feature,
@@ -493,11 +480,93 @@ class TestGenBitstreamFasmProcessing:
         mock_logger = mocker.patch("FABulous_bit_gen.bit_gen.logger")
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        return mock_logger
+
+    def test_overlapping_features_emit_warning(self, temp_output_dir, mocker):
+        """Two features mapping to the same bit index should trigger a logger warning."""
+        mock_logger = self._run_with_features(
+            ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
+            self._overlapping_spec(),
+            temp_output_dir,
+            mocker,
+        )
 
         mock_logger.warning.assert_called_once()
         warning_msg = mock_logger.warning.call_args[0][0]
         assert "X0Y1" in warning_msg
         assert "50" in warning_msg
+
+    def test_overlapping_zero_valued_bit_emits_warning(self, temp_output_dir, mocker):
+        """Overwrite of a zero-valued bit must still warn.
+
+        A feature can map a bit to value '0'. Since tile_bits is initialised
+        to all zeros, a value-based sentinel (old != 0) would miss this case.
+        The touched_bits tracker must detect it regardless of the stored value.
+        """
+        spec_dict = {
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
+            "TileSpecs": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "0"},   # explicitly writes 0 to bit 50
+                    "FEAT.B": {50: "1"},   # then overwrites bit 50 with 1
+                },
+                "X0Y2": {},
+            },
+            "TileSpecs_No_Mask": {
+                "X0Y0": {},
+                "X0Y1": {
+                    "FEAT.A": {50: "0"},
+                    "FEAT.B": {50: "1"},
+                },
+                "X0Y2": {},
+            },
+            "FrameMap": {
+                "NULL": {},
+                "W_IO": {0: "11111111111111111111111111111111"},
+            },
+            "FrameMapEncode": {},
+        }
+
+        mock_logger = self._run_with_features(
+            ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
+            spec_dict,
+            temp_output_dir,
+            mocker,
+        )
+
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "X0Y1" in warning_msg
+        assert "50" in warning_msg
+
+    def test_non_overlapping_features_emit_no_warning(self, temp_output_dir, mocker):
+        """Features that write to distinct bit indices should not trigger any warning."""
+        mock_logger = self._run_with_features(
+            ["X0Y1.W2MID7.A_I", "X0Y1.GND0.A_T"],
+            {
+                "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+                "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X1Y1": "LUT4AB", "X0Y2": "NULL", "X1Y2": "NULL"},
+                "TileSpecs": {
+                    "X0Y1": {"W2MID7.A_I": {110: "1", 111: "0"}, "GND0.A_T": {50: "1"}},
+                    "X1Y1": {}, "X0Y0": {}, "X0Y2": {}, "X1Y2": {},
+                },
+                "TileSpecs_No_Mask": {
+                    "X0Y1": {"W2MID7.A_I": {110: "1", 111: "0"}, "GND0.A_T": {50: "1"}},
+                    "X1Y1": {}, "X0Y0": {}, "X0Y2": {}, "X1Y2": {},
+                },
+                "FrameMap": {
+                    "NULL": {}, "W_IO": {0: "11111111111111111111111111111111"},
+                    "LUT4AB": {0: "00000001111111111111111111111011"},
+                },
+                "FrameMapEncode": {},
+            },
+            temp_output_dir,
+            mocker,
+        )
+
+        mock_logger.warning.assert_not_called()
 
 
 class TestGenBitstreamErrorHandling:

@@ -153,6 +153,12 @@ def _apply_fasm_features(
     # SPEC FORMAT
     # Please bear in mind that the tilespecs are now mapped by
     # tile loc and not by cell type
+
+    # Track which bit indices have already been written for each tile so that
+    # overwrites are detected regardless of the bit value (a feature can
+    # legitimately map a bit to 0, making a value-based sentinel unreliable).
+    touched_bits: dict[str, set] = {tile: set() for tile in tile_bits}
+
     for line in canon_list:
         if not line.set_feature:
             continue
@@ -174,13 +180,14 @@ def _apply_fasm_features(
             if spec_dict["TileSpecs"][tile_loc][feature_name]:
                 for bit_idx, bit_val in spec_dict["TileSpecs"][tile_loc][feature_name].items():
                     new_val = int(bit_val)
-                    if tile_bits[tile_loc][bit_idx] != 0:
+                    if bit_idx in touched_bits[tile_loc]:
                         logger.warning(
                             f"Bit {bit_idx} of tile {tile_loc} is being overwritten "
                             f"by feature {feature_name} "
                             f"(old value: {tile_bits[tile_loc][bit_idx]}, "
                             f"new value: {new_val})"
                         )
+                    touched_bits[tile_loc].add(bit_idx)
                     tile_bits[tile_loc][bit_idx] = new_val
                 for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][feature_name].items():
                     tile_bits_no_mask[tile_loc][bit_idx] = int(bit_val)
