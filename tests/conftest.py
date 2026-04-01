@@ -213,20 +213,3 @@ def synthetic_fasm_lines_invalid_tile():
         ),
     ]
 
-
-@pytest.fixture
-def synthetic_fasm_lines_invalid_feature():
-    """FASM lines with valid tile but invalid feature."""
-    return [
-        FasmLine(
-            set_feature=SetFasmFeature(
-                feature="X0Y1.UNKNOWN_FEATURE",
-                start=None,
-                end=None,
-                value=1,
-                value_format=None,
-            ),
-            annotations=None,
-            comment=None,
-        ),
-    ]

@@ -134,7 +134,9 @@ class TestGenBitstreamFasmProcessing:
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-        assert output_file.with_suffix(".csv").exists()
+        csv_content = output_file.with_suffix(".csv").read_text()
+        # Valid feature was processed; CLK feature filtered (would raise SpecMissMatch if not)
+        assert "X0Y1" in csv_content
 
     def test_valid_feature_sets_bits_in_tile(
         self, minimal_spec_dict, temp_output_dir, mocker
@@ -569,27 +571,6 @@ class TestGenBitstreamErrorHandling:
         error_msg = str(exc_info.value)
         assert "X0Y1" in error_msg
         assert "INVALID.FEATURE" in error_msg
-        mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
-        )
-        mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
-        )
-
-        def mock_set_feature_to_str(feature):
-            return feature.feature
-
-        mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
-            side_effect=mock_set_feature_to_str,
-        )
-
-        with pytest.raises(SpecMissMatch) as exc_info:
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
-
-        error_msg = str(exc_info.value)
-        assert "X0Y1" in error_msg
-        assert "INVALID.FEATURE" in error_msg
 
 
 class TestGenBitstreamFaultCases:
@@ -920,8 +901,9 @@ class TestGenBitstreamEdgeCases:
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-        csv_path = output_file.with_suffix(".csv")
-        assert csv_path.exists()
+        csv_content = output_file.with_suffix(".csv").read_text()
+        # Extra part silently ignored; feature "W2MID7.A_I" resolved correctly
+        assert "X0Y1" in csv_content
 
     def test_feature_containing_clk_substring(
         self, minimal_spec_dict, temp_output_dir, mocker
@@ -968,7 +950,9 @@ class TestGenBitstreamEdgeCases:
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-        assert output_file.with_suffix(".csv").exists()
+        csv_content = output_file.with_suffix(".csv").read_text()
+        # CLK-substring feature filtered (would raise SpecMissMatch if not)
+        assert "X0Y1" in csv_content
 
     def test_large_grid_dimensions(self, temp_output_dir, mocker):
         """Test with large grid (many tiles)."""
@@ -1401,8 +1385,8 @@ class TestGenBitstreamCsvOutput:
                 first_tile_line = line
                 break
 
-        if first_tile_line:
-            assert "Y1" in first_tile_line
+        assert first_tile_line is not None, "CSV contained no tile lines"
+        assert "Y1" in first_tile_line
 
 
 class TestGenBitstreamVhdlOutput:
@@ -1532,6 +1516,208 @@ class TestGenBitstreamVerilogOutput:
         vh_content = vh_path.read_text()
 
         assert "640'b" in vh_content
+
+
+class TestGenBitstreamNoneSetFeature:
+    """Tests for FasmLine with set_feature=None (comment/annotation lines)."""
+
+    def test_fasm_line_with_none_set_feature_is_skipped(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ):
+        """FasmLine with set_feature=None should be silently skipped."""
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        fasm_lines = [
+            FasmLine(set_feature=None, annotations=None, comment="# a comment"),
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.W2MID7.A_I",
+                    start=None,
+                    end=None,
+                    value=1,
+                    value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            ),
+        ]
+
+        with spec_file.open("wb") as f:
+            pickle.dump(minimal_spec_dict, f)
+
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+
+        def mock_set_feature_to_str(feature):
+            return feature.feature
+
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            side_effect=mock_set_feature_to_str,
+        )
+
+        # Should not raise TypeError/AttributeError from set_feature_to_str(None)
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        csv_content = output_file.with_suffix(".csv").read_text()
+        assert "X0Y1" in csv_content
+
+    def test_all_none_set_features_produces_zero_bitstream(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ):
+        """FASM with only None set_features (comments only) should succeed."""
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        fasm_lines = [
+            FasmLine(set_feature=None, annotations=None, comment="# comment 1"),
+            FasmLine(set_feature=None, annotations=None, comment="# comment 2"),
+        ]
+
+        with spec_file.open("wb") as f:
+            pickle.dump(minimal_spec_dict, f)
+
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+        mocker.patch("FABulous_bit_gen.bit_gen.set_feature_to_str")
+
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        assert output_file.with_suffix(".csv").exists()
+
+
+class TestGenBitstreamCsvRowBoundaries:
+    """Tests that top and bottom rows are excluded from CSV output."""
+
+    def test_bottom_row_absent_from_csv(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ):
+        """Y0 (bottom row) should not appear in CSV output."""
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        with spec_file.open("wb") as f:
+            pickle.dump(minimal_spec_dict, f)
+
+        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        csv_content = output_file.with_suffix(".csv").read_text()
+        tile_lines = [l for l in csv_content.splitlines() if l.startswith("X")]
+        assert tile_lines, "CSV contained no tile lines"
+        assert all("Y0" not in l for l in tile_lines)
+
+    def test_top_row_absent_from_csv(self, minimal_spec_dict, temp_output_dir, mocker):
+        """Y{max} (top row) should not appear in CSV output."""
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        with spec_file.open("wb") as f:
+            pickle.dump(minimal_spec_dict, f)
+
+        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        csv_content = output_file.with_suffix(".csv").read_text()
+        tile_lines = [l for l in csv_content.splitlines() if l.startswith("X")]
+        assert tile_lines, "CSV contained no tile lines"
+        # minimal_spec_dict has Y2 as max row
+        assert all("Y2" not in l for l in tile_lines)
+
+
+class TestGenBitstreamSpecInconsistency:
+    """Tests for TileSpecs / TileSpecs_No_Mask inconsistency."""
+
+    def test_feature_missing_from_tilespecs_no_mask_raises_keyerror(
+        self, temp_output_dir, mocker
+    ):
+        """Feature in TileSpecs but absent from TileSpecs_No_Mask should raise KeyError."""
+        spec_dict = {
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
+            "TileSpecs": {
+                "X0Y0": {},
+                "X0Y1": {"W2MID7.A_I": {110: "1"}},
+                "X0Y2": {},
+            },
+            "TileSpecs_No_Mask": {
+                "X0Y0": {},
+                "X0Y1": {},  # feature intentionally absent here
+                "X0Y2": {},
+            },
+            "FrameMap": {
+                "NULL": {},
+                "W_IO": {0: "11111111111111111111111111111111"},
+            },
+            "FrameMapEncode": {},
+        }
+
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        fasm_lines = [
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.W2MID7.A_I",
+                    start=None,
+                    end=None,
+                    value=1,
+                    value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            ),
+        ]
+
+        with spec_file.open("wb") as f:
+            pickle.dump(spec_dict, f)
+
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+
+        def mock_set_feature_to_str(feature):
+            return feature.feature
+
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            side_effect=mock_set_feature_to_str,
+        )
+
+        with pytest.raises(KeyError):
+            genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
 
 class TestGenBitstreamBinaryOutput:

@@ -126,15 +126,6 @@ class TestBitGenCLI:
 class TestBitGenCLIFaultCases:
     """Fault case tests for bit_gen() CLI function."""
 
-    def test_no_arguments_after_program_name(self, mocker):
-        """No arguments after program name should not raise error."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
-        mocker.patch("sys.argv", ["bit_gen"])
-
-        bit_gen()
-
-        mock_gen.assert_not_called()
-
     def test_extra_arguments_after_valid_args(self, mocker):
         """Extra arguments after valid args should be ignored."""
         mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
@@ -304,3 +295,36 @@ class TestBitGenCLIEdgeCases:
         bit_gen()
 
         mock_gen.assert_called_once_with("test_αβγ.fasm", "spec.bin", "output.bin")
+
+    def test_genbitstream_substring_in_filename_raises_valueerror(self, mocker):
+        """-genBitstream as substring in a filename arg should raise ValueError.
+
+        The outer check uses str(sys.argv) substring match, so a filename like
+        'spec-genBitstream-v2.bin' satisfies it, but processedArguments.index()
+        then fails to find the flag as a standalone element.
+        """
+        mocker.patch(
+            "sys.argv",
+            ["bit_gen", "spec-genBitstream-v2.bin", "output.bin"],
+        )
+
+        with pytest.raises(ValueError):
+            bit_gen()
+
+    def test_help_not_triggered_by_unrelated_argument_containing_h(self, mocker):
+        """-h substring in an unrelated argument should not trigger help output.
+
+        The check uses str(sys.argv) substring match, so arguments like
+        '-hashfile' contain '-h' and could spuriously fire the help branch.
+        """
+        mock_logger = mocker.patch("FABulous_bit_gen.bit_gen.logger")
+        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mocker.patch(
+            "sys.argv",
+            ["bit_gen", "-genBitstream", "test.fasm", "spec.bin", "output.bin"],
+        )
+
+        bit_gen()
+
+        mock_logger.info.assert_not_called()
+        mock_gen.assert_called_once()

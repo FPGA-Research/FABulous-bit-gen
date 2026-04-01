@@ -82,6 +82,8 @@ def genBitstream(fasmFile: str, specFile: str, bitstreamFile: str) -> None:
     # tile loc and not by cell type
 
     for line in canonList:
+        if not line.set_feature:
+            continue
         if "CLK" in set_feature_to_str(line.set_feature):
             continue
         if line.set_feature:
@@ -222,12 +224,13 @@ def genBitstream(fasmFile: str, specFile: str, bitstreamFile: str) -> None:
     # Tile Loc, Tile Type, X, Y, bits...... \n
     # Each line is one tile
     # Write out bitstream CSV representation
-    with Path(bitstreamFile.replace("bin", "csv")).open("w+") as f:
+    bitstream_path = Path(bitstreamFile)
+    with bitstream_path.with_suffix(".csv").open("w+") as f:
         f.write(outStr)
     # Write out HDL representations
-    with Path(bitstreamFile.replace("bin", "vh")).open("w+") as f:
+    with bitstream_path.with_suffix(".vh").open("w+") as f:
         f.write(verilog_str)
-    with Path(bitstreamFile.replace("bin", "vhd")).open("w+") as f:
+    with bitstream_path.with_suffix(".vhd").open("w+") as f:
         f.write(vhdl_str)
     # Write out binary representation
     with Path(bitstreamFile).open("bw+") as f:

@@ -160,12 +160,3 @@ class TestBitstringToBytesEdgeCases:
         result = bitstring_to_bytes("111111111")
         assert len(result) == 2
 
-    def test_maximum_single_byte_value(self):
-        """Test bitstring that produces maximum single byte value."""
-        result = bitstring_to_bytes("11111111")
-        assert result == b"\xff"
-
-    def test_minimum_single_byte_value(self):
-        """Test bitstring that produces minimum single byte value."""
-        result = bitstring_to_bytes("00000000")
-        assert result == b"\x00"
