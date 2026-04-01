@@ -47,7 +47,27 @@ def bitstring_to_bytes(s: str) -> bytes:
 
 
 def _parse_fasm_to_canon_list(fasm_file: str) -> list:
-    """Parse FASM file and return its canonicalised feature list."""
+    """Parse a FASM file and return its canonicalised feature list.
+
+    Reads the raw FASM file, converts it to canonical form (which resolves
+    any shorthand and normalises feature values), then parses that canonical
+    string back into a list of FasmLine objects ready for processing.
+
+    Parameters
+    ----------
+    fasm_file : str
+        Path to the FASM file to parse.
+
+    Returns
+    -------
+    list[FasmLine]
+        Canonicalised list of FASM lines parsed from the file.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``fasm_file`` does not exist.
+    """
     fasm_lines = parse_fasm_filename(fasm_file)
     canonical_str = fasm_tuple_to_string(fasm_lines, True)
     return list(parse_fasm_string(canonical_str))
@@ -56,8 +76,24 @@ def _parse_fasm_to_canon_list(fasm_file: str) -> list:
 def _init_tile_bits(spec_dict: dict) -> tuple:
     """Initialise per-tile bit arrays to all zeros.
 
-    Returns two dicts keyed by tile location: one for the masked bitstream
-    and one for the unmasked (No_Mask) bitstream used by HDL emulation.
+    Allocates two flat integer lists of length
+    ``MaxFramesPerCol * FrameBitsPerRow`` for every tile in ``TileMap``:
+    one for the masked bitstream written to the binary output, and one for
+    the unmasked (No_Mask) bitstream used by the HDL emulation constants.
+
+    Parameters
+    ----------
+    spec_dict : dict
+        Bitstream specification dictionary loaded from the pickle spec file.
+        Must contain ``ArchSpecs`` (with ``FrameBitsPerRow`` and
+        ``MaxFramesPerCol``) and ``TileMap``.
+
+    Returns
+    -------
+    tuple[dict[str, list[int]], dict[str, list[int]]]
+        A pair ``(tile_bits, tile_bits_no_mask)``, each mapping tile location
+        strings (e.g. ``'X1Y2'``) to a zero-filled integer list of length
+        ``MaxFramesPerCol * FrameBitsPerRow``.
     """
     frame_bits_per_row = spec_dict["ArchSpecs"]["FrameBitsPerRow"]
     max_frames_per_col = spec_dict["ArchSpecs"]["MaxFramesPerCol"]
@@ -76,7 +112,39 @@ def _apply_fasm_features(
     tile_bits: dict,
     tile_bits_no_mask: dict,
 ) -> None:
-    """Apply FASM feature lines to the tile bit arrays in place."""
+    """Apply FASM feature lines to the tile bit arrays in place.
+
+    Iterates over every canonicalised FASM line, skipping comment/annotation
+    lines (``set_feature is None``) and any feature whose name contains
+    ``'CLK'``.  For each remaining feature the tile location and feature name
+    are resolved against ``TileSpecs`` and the corresponding bit indices are
+    written into both ``tile_bits`` (masked) and ``tile_bits_no_mask``
+    (unmasked) using the values stored in the spec.
+
+    Parameters
+    ----------
+    canon_list : list[FasmLine]
+        Canonicalised FASM lines as returned by ``_parse_fasm_to_canon_list``.
+    spec_dict : dict
+        Bitstream specification dictionary.  Must contain ``TileMap``,
+        ``TileSpecs``, and ``TileSpecs_No_Mask``.
+    tile_bits : dict[str, list[int]]
+        Per-tile bit array for the masked bitstream, mutated in place.
+    tile_bits_no_mask : dict[str, list[int]]
+        Per-tile bit array for the unmasked HDL bitstream, mutated in place.
+
+    Raises
+    ------
+    SpecMissMatch
+        If a feature's tile location is not present in ``TileMap``, or if
+        the feature name is not found in ``TileSpecs`` for that tile.
+    IndexError
+        If a feature string contains fewer than three dot-separated parts
+        (i.e. does not follow the ``TileLoc.Part1.Part2`` convention).
+    KeyError
+        If a feature is present in ``TileSpecs`` for a tile but absent from
+        the corresponding ``TileSpecs_No_Mask`` entry.
+    """
     # NOTE: SOME OF THE FOLLOWING METHODS HAVE BEEN CHANGED DUE TO A MODIFIED BITSTREAM
     # SPEC FORMAT
     # Please bear in mind that the tilespecs are now mapped by
@@ -114,7 +182,30 @@ def _apply_fasm_features(
 
 
 def _compute_grid_size(tile_bits: dict) -> tuple:
-    """Compute grid dimensions (num_columns, num_rows) from tile coordinate keys."""
+    """Compute grid dimensions from tile coordinate keys.
+
+    Scans all keys in ``tile_bits`` (expected to follow the ``XnYm`` naming
+    convention) and returns the number of distinct columns and rows in the
+    grid.  The counts are one-based, so a tile at ``X3Y2`` contributes to a
+    grid of at least 4 columns and 3 rows.
+
+    Parameters
+    ----------
+    tile_bits : dict[str, list[int]]
+        Per-tile bit arrays whose keys are tile location strings (e.g.
+        ``'X0Y1'``, ``'X2Y3'``).
+
+    Returns
+    -------
+    tuple[int, int]
+        ``(num_columns, num_rows)`` — the total width and height of the grid.
+
+    Raises
+    ------
+    AttributeError
+        If any tile key does not match the ``X<digits>Y<digits>`` pattern,
+        causing the regex match to return ``None``.
+    """
     # Write output string and introduce mask
     coords_re = re.compile(r"X(\d*)Y(\d*)")
     num_columns = 0
@@ -127,7 +218,30 @@ def _compute_grid_size(tile_bits: dict) -> tuple:
 
 
 def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict) -> tuple:
-    """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings."""
+    """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings.
+
+    Produces one `` `define`` macro per non-NULL tile for Verilog and one
+    ``constant`` declaration per non-NULL tile for VHDL.  Tiles whose type is
+    ``'NULL'`` or whose ``FrameMap`` entry is empty are skipped.  The bit
+    vector is written in descending index order (MSB first) as required by
+    both HDL formats.
+
+    Parameters
+    ----------
+    tile_bits_no_mask : dict[str, list[int]]
+        Unmasked per-tile bit arrays (as produced by ``_apply_fasm_features``
+        into the ``tile_bits_no_mask`` structure).
+    spec_dict : dict
+        Bitstream specification dictionary.  Must contain ``ArchSpecs``
+        (``FrameBitsPerRow``, ``MaxFramesPerCol``), ``TileMap``, and
+        ``FrameMap``.
+
+    Returns
+    -------
+    tuple[str, str]
+        ``(verilog_str, vhdl_str)`` — the complete Verilog header file content
+        and the complete VHDL package file content, respectively.
+    """
     frame_bits_per_row = spec_dict["ArchSpecs"]["FrameBitsPerRow"]
     max_frames_per_col = spec_dict["ArchSpecs"]["MaxFramesPerCol"]
     total_bits = max_frames_per_col * frame_bits_per_row
@@ -167,8 +281,31 @@ def _build_csv_and_frame_data(
 ) -> tuple:
     """Build the CSV output string and the per-column frame byte arrays.
 
-    Returns (csv_str, bit_array) where bit_array[col][frame] holds the
-    packed bytes for that column/frame combination.
+    Iterates over interior rows only (rows 1 through ``num_rows - 2``
+    inclusive, in descending order) because the top and bottom rows carry no
+    bitstream content (hardcoded convention throughout FABulous).  For each
+    tile it appends a header line followed by one line per frame, and packs
+    the frame bits into the ``bit_array`` used later to assemble the binary
+    bitstream.
+
+    Parameters
+    ----------
+    tile_bits : dict[str, list[int]]
+        Masked per-tile bit arrays (after feature application).
+    spec_dict : dict
+        Bitstream specification dictionary.  Must contain ``ArchSpecs``
+        (``FrameBitsPerRow``, ``MaxFramesPerCol``) and ``TileMap``.
+    num_rows : int
+        Total number of rows in the grid (from ``_compute_grid_size``).
+    num_columns : int
+        Total number of columns in the grid (from ``_compute_grid_size``).
+
+    Returns
+    -------
+    tuple[str, list[list[bytes]]]
+        ``(csv_str, bit_array)`` where ``csv_str`` is the full CSV text and
+        ``bit_array[col][frame]`` holds the packed bytes for that
+        column/frame combination, ready for binary assembly.
     """
     frame_bits_per_row = spec_dict["ArchSpecs"]["FrameBitsPerRow"]
     max_frames_per_col = spec_dict["ArchSpecs"]["MaxFramesPerCol"]
@@ -211,7 +348,26 @@ def _build_csv_and_frame_data(
 def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
     """Assemble the final binary bitstream from per-column frame data.
 
-    Prepends the FABulous sync header and appends the desync frame.
+    Prepends the 20-byte FABulous sync header, then for every column and
+    frame emits a 32-bit frame-select word followed by the frame's data
+    bytes.  The frame-select word encodes the column index in the five
+    least-significant bits (in reversed bit order) and sets the bit
+    corresponding to the active frame index.  Finally appends the 4-byte
+    desync frame (bit 20 is the desync flag).
+
+    Parameters
+    ----------
+    bit_array : list[list[bytes]]
+        ``bit_array[col][frame]`` — packed frame bytes as produced by
+        ``_build_csv_and_frame_data``.
+    num_columns : int
+        Total number of columns in the grid.
+
+    Returns
+    -------
+    bytes
+        Complete binary bitstream including the sync header, all frame-select
+        words and frame data, and the trailing desync frame.
     """
     bitstream = bytes.fromhex("00AAFF01000000010000000000000000FAB0FAB1")
 
@@ -237,14 +393,38 @@ def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
 def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     """Generate the bitstream from the FASM file using the bitstream specification.
 
+    Orchestrates the full bitstream generation pipeline:
+
+    1. Parse the FASM file into a canonicalised feature list.
+    2. Load the bitstream specification from the pickle file.
+    3. Initialise per-tile bit arrays and apply FASM features to them.
+    4. Derive grid dimensions from the tile map.
+    5. Build HDL emulation strings (Verilog and VHDL).
+    6. Build the CSV representation and pack frame data.
+    7. Assemble the binary bitstream.
+    8. Write all four output files (.csv, .vh, .vhd, .bin).
+
     Parameters
     ----------
     fasm_file : str
-        Path to FASM file containing configuration features
+        Path to the FASM file containing the configuration features to apply.
     spec_file : str
-        Path to pickle file containing bitstream specification
+        Path to the pickle file containing the bitstream specification
+        (``TileMap``, ``TileSpecs``, ``FrameMap``, ``ArchSpecs``, etc.).
     bitstream_file : str
-        Output path for generated bitstream file
+        Base output path.  The extension is replaced to produce the four
+        output files: ``<base>.csv``, ``<base>.vh``, ``<base>.vhd``, and
+        ``<base>.bin`` (the binary bitstream).
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``fasm_file`` or ``spec_file`` does not exist.
+    pickle.UnpicklingError
+        If ``spec_file`` cannot be deserialised as a valid pickle.
+    SpecMissMatch
+        If a FASM feature references a tile location or feature name not
+        present in the bitstream specification.
     """
     canon_list = _parse_fasm_to_canon_list(fasm_file)
 
