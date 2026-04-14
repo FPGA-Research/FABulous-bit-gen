@@ -338,6 +338,7 @@ def _build_csv_and_frame_data(
     spec_dict: dict,
     num_rows: int,
     num_columns: int,
+    legacy: bool = True,
 ) -> tuple:
     """Build the CSV output string and the per-column frame byte arrays.
 
@@ -359,6 +360,9 @@ def _build_csv_and_frame_data(
         Total number of rows in the grid (from ``_compute_grid_size``).
     num_columns : int
         Total number of columns in the grid (from ``_compute_grid_size``).
+    legacy : bool, optional
+        When ``True`` (default), skip the first and last row (FABulous 1.0
+        behaviour).  When ``False``, include all rows.
 
     Returns
     -------
@@ -373,9 +377,15 @@ def _build_csv_and_frame_data(
     csv_str = ""
     bit_array = [[b"" for _ in range(max_frames_per_col)] for _ in range(num_columns)]
 
-    # Top/bottom rows have no bitstream content (hardcoded throughout FABulous)
-    # reversed row order
-    for y in range(num_rows - BORDER_ROWS, 0, -1):
+    if legacy:
+        logger.info("Legacy FABulous 1.0 bitstream generation enabled.")
+        start_row = num_rows - BORDER_ROWS
+        stop_row = 0
+    else:
+        start_row = num_rows - 1
+        stop_row = -1
+
+    for y in range(start_row, stop_row, -1):
         for x in range(num_columns):
             tile_key = f"X{x}Y{y}"
             tile_csv = ",".join((tile_key, spec_dict["TileMap"][tile_key], str(x), str(y)))
@@ -490,12 +500,14 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     with Path(spec_file).open("rb") as f:
         spec_dict = pickle.load(f)
 
+    legacy = spec_dict.get("legacy", True)
+
     tile_bits, tile_bits_no_mask = _init_tile_bits(spec_dict)
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
     verilog_str, vhdl_str = _build_hdl_strings(tile_bits_no_mask, spec_dict)
-    csv_str, bit_array = _build_csv_and_frame_data(tile_bits, spec_dict, num_rows, num_columns)
+    csv_str, bit_array = _build_csv_and_frame_data(tile_bits, spec_dict, num_rows, num_columns, legacy)
     bitstream_bytes = _build_binary_bitstream(bit_array, num_columns)
 
     # Note - format in output file is line by line:
