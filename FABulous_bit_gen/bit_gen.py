@@ -41,8 +41,13 @@ MAX_FRAMES_PER_COL: int = 20
 SYNC_HEADER_HEX: str = "00AAFF01000000010000000000000000FAB0FAB1"
 """FABulous 20-byte sync header that opens every bitstream."""
 
-DESYNC_FRAME_HEX: str = "00100000"
-"""FABulous 4-byte desync frame appended at the end (bit 20 is the desync flag)."""
+DESYNC_BIT: int = 20
+"""Bit position of the desync flag inside the 32-bit frame-select word."""
+
+DESYNC_FRAME: bytes = (1 << DESYNC_BIT).to_bytes(
+    FRAME_SELECT_BITS // BITS_PER_BYTE, byteorder="big"
+)
+"""FABulous 4-byte desync frame: bit ``DESYNC_BIT`` set in a big-endian 32-bit word."""
 
 try:
     from fasm import (
@@ -439,8 +444,8 @@ def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
             bitstream += bitstring_to_bytes(frame_select_str)
             bitstream += bit_array[col][frame_idx]
 
-    # Add desync frame (bit 20 is the desync flag)
-    bitstream += bytes.fromhex(DESYNC_FRAME_HEX)
+    # Add desync frame (bit DESYNC_BIT is the desync flag)
+    bitstream += DESYNC_FRAME
     return bitstream
 
 
