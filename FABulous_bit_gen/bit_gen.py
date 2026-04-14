@@ -11,6 +11,7 @@ generating the final bitstream output in various formats.
 """
 
 import argparse
+import math
 import pickle
 import re
 from pathlib import Path
@@ -19,12 +20,17 @@ from loguru import logger
 
 from FABulous_bit_gen.custom_exception import SpecMissMatch
 
-# ---------------------------------------------------------------------------
-# Bitstream format constants
-# ---------------------------------------------------------------------------
+try:
+    from fasm import (
+        fasm_tuple_to_string,
+        parse_fasm_filename,
+        parse_fasm_string,
+        set_feature_to_str,
+    )
+except ImportError:
+    logger.critical("Could not import fasm. Bitstream generation not supported.")
 
-BITS_PER_BYTE: int = 8
-"""Number of bits in one byte; used for byte-aligned packing."""
+# Bitstream format constants
 
 BORDER_ROWS: int = 2
 """Number of border rows (top + bottom) that carry no bitstream content."""
@@ -45,20 +51,9 @@ DESYNC_BIT: int = 20
 """Bit position of the desync flag inside the 32-bit frame-select word."""
 
 DESYNC_FRAME: bytes = (1 << DESYNC_BIT).to_bytes(
-    FRAME_SELECT_BITS // BITS_PER_BYTE, byteorder="big"
+    FRAME_SELECT_BITS // 8, byteorder="big"
 )
 """FABulous 4-byte desync frame: bit ``DESYNC_BIT`` set in a big-endian 32-bit word."""
-
-try:
-    from fasm import (
-        fasm_tuple_to_string,
-        parse_fasm_filename,
-        parse_fasm_string,
-        set_feature_to_str,
-    )
-except ImportError:
-    logger.critical("Could not import fasm. Bitstream generation not supported.")
-
 
 def bitstring_to_bytes(s: str) -> bytes:
     """Convert binary string to bytes.
@@ -73,8 +68,7 @@ def bitstring_to_bytes(s: str) -> bytes:
     bytes
         Byte representation of the binary string
     """
-    return int(s, 2).to_bytes((len(s) + BITS_PER_BYTE - 1) // BITS_PER_BYTE, byteorder="big")
-
+    return int(s, 2).to_bytes(math.ceil(len(s) / 8), byteorder="big")
 
 def _parse_fasm_to_canon_list(fasm_file: str) -> list:
     """Parse a FASM file and return its canonicalised feature list.
@@ -101,7 +95,6 @@ def _parse_fasm_to_canon_list(fasm_file: str) -> list:
     fasm_lines = parse_fasm_filename(fasm_file)
     canonical_str = fasm_tuple_to_string(fasm_lines, True)
     return list(parse_fasm_string(canonical_str))
-
 
 def _init_tile_bits(spec_dict: dict) -> tuple:
     """Initialise per-tile bit arrays to all zeros.
@@ -134,7 +127,6 @@ def _init_tile_bits(spec_dict: dict) -> tuple:
     tile_bits = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     tile_bits_no_mask = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     return tile_bits, tile_bits_no_mask
-
 
 def _apply_fasm_features(
     canon_list: list,
@@ -240,7 +232,6 @@ def _apply_fasm_features(
                 "found in fasm file was not found in the bitstream spec"
             )
 
-
 def _compute_grid_size(tile_bits: dict) -> tuple:
     """Compute grid dimensions from tile coordinate keys.
 
@@ -276,8 +267,7 @@ def _compute_grid_size(tile_bits: dict) -> tuple:
         num_rows = max(int(coords_match.group(2)) + 1, num_rows)
     return num_columns, num_rows
 
-
-def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict) -> tuple:
+def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, legacy: bool = True) -> tuple:
     """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings.
 
     Produces one `` `define`` macro per non-NULL tile for Verilog and one
@@ -295,6 +285,8 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict) -> tuple:
         Bitstream specification dictionary.  Must contain ``ArchSpecs``
         (``FrameBitsPerRow``, ``MaxFramesPerCol``), ``TileMap``, and
         ``FrameMap``.
+    legacy : bool, optional
+        default ``True``: skip tiles in the first and last row
 
     Returns
     -------
@@ -312,7 +304,7 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict) -> tuple:
     )
     for tile_key, bits in tile_bits_no_mask.items():
         tile_type = spec_dict["TileMap"][tile_key]
-        if tile_type == "NULL" or len(spec_dict["FrameMap"][tile_type]) == 0:
+        if tile_type == "NULL" or (len(spec_dict["FrameMap"][tile_type]) == 0 and legacy):
             continue
 
         verilog_str += f"// {tile_key}, {tile_type}\n"
@@ -331,7 +323,6 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict) -> tuple:
         vhdl_str += '";\n'
     vhdl_str += "end package emulate_bitstream;"
     return verilog_str, vhdl_str
-
 
 def _build_csv_and_frame_data(
     tile_bits: dict,
@@ -414,7 +405,6 @@ def _build_csv_and_frame_data(
 
     return csv_str, bit_array
 
-
 def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
     """Assemble the final binary bitstream from per-column frame data.
 
@@ -457,7 +447,6 @@ def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
     # Add desync frame (bit DESYNC_BIT is the desync flag)
     bitstream += DESYNC_FRAME
     return bitstream
-
 
 def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     """Generate the bitstream from the FASM file using the bitstream specification.
@@ -506,7 +495,7 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
-    verilog_str, vhdl_str = _build_hdl_strings(tile_bits_no_mask, spec_dict)
+    verilog_str, vhdl_str = _build_hdl_strings(tile_bits_no_mask, spec_dict, legacy)
     csv_str, bit_array = _build_csv_and_frame_data(tile_bits, spec_dict, num_rows, num_columns, legacy)
     bitstream_bytes = _build_binary_bitstream(bit_array, num_columns)
 
@@ -525,7 +514,6 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     # Write out binary representation
     with output_path.open("bw+") as f:
         f.write(bitstream_bytes)
-
 
 #####################################################################################
 # Main
@@ -552,7 +540,6 @@ def bit_gen() -> None:
         genBitstream(args.fasm_file, args.spec_file, args.output_file)
     else:
         parser.print_help()
-
 
 if __name__ == "__main__":
     bit_gen()
