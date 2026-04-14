@@ -19,6 +19,31 @@ from loguru import logger
 
 from FABulous_bit_gen.custom_exception import SpecMissMatch
 
+# ---------------------------------------------------------------------------
+# Bitstream format constants
+# ---------------------------------------------------------------------------
+
+BITS_PER_BYTE: int = 8
+"""Number of bits in one byte; used for byte-aligned packing."""
+
+BORDER_ROWS: int = 2
+"""Number of border rows (top + bottom) that carry no bitstream content."""
+
+COLUMN_INDEX_BITS: int = 5
+"""Bits used to encode the column index inside the frame-select word."""
+
+FRAME_SELECT_BITS: int = 32
+"""Width in bits of the frame-select word prepended to each frame."""
+
+MAX_FRAMES_PER_COL: int = 20
+"""Maximum number of frames per column in the FABulous bitstream format."""
+
+SYNC_HEADER_HEX: str = "00AAFF01000000010000000000000000FAB0FAB1"
+"""FABulous 20-byte sync header that opens every bitstream."""
+
+DESYNC_FRAME_HEX: str = "00100000"
+"""FABulous 4-byte desync frame appended at the end (bit 20 is the desync flag)."""
+
 try:
     from fasm import (
         fasm_tuple_to_string,
@@ -43,7 +68,7 @@ def bitstring_to_bytes(s: str) -> bytes:
     bytes
         Byte representation of the binary string
     """
-    return int(s, 2).to_bytes((len(s) + 7) // 8, byteorder="big")
+    return int(s, 2).to_bytes((len(s) + BITS_PER_BYTE - 1) // BITS_PER_BYTE, byteorder="big")
 
 
 def _parse_fasm_to_canon_list(fasm_file: str) -> list:
@@ -345,7 +370,7 @@ def _build_csv_and_frame_data(
 
     # Top/bottom rows have no bitstream content (hardcoded throughout FABulous)
     # reversed row order
-    for y in range(num_rows - 2, 0, -1):
+    for y in range(num_rows - BORDER_ROWS, 0, -1):
         for x in range(num_columns):
             tile_key = f"X{x}Y{y}"
             tile_csv = ",".join((tile_key, spec_dict["TileMap"][tile_key], str(x), str(y)))
@@ -399,14 +424,14 @@ def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
         Complete binary bitstream including the sync header, all frame-select
         words and frame data, and the trailing desync frame.
     """
-    bitstream = bytes.fromhex("00AAFF01000000010000000000000000FAB0FAB1")
+    bitstream = bytes.fromhex(SYNC_HEADER_HEX)
 
     for col in range(num_columns):
-        for frame_idx in range(20):
-            col_idx_reversed = f"{col:05b}"[::-1]
-            frame_select = ["0"] * 32
+        for frame_idx in range(MAX_FRAMES_PER_COL):
+            col_idx_reversed = f"{col:0{COLUMN_INDEX_BITS}b}"[::-1]
+            frame_select = ["0"] * FRAME_SELECT_BITS
 
-            for k in range(-5, 0, 1):
+            for k in range(-COLUMN_INDEX_BITS, 0, 1):
                 frame_select[k] = col_idx_reversed[k]
             frame_select[frame_idx] = "1"
             frame_select_str = ("".join(frame_select))[::-1]
@@ -414,9 +439,8 @@ def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
             bitstream += bitstring_to_bytes(frame_select_str)
             bitstream += bit_array[col][frame_idx]
 
-    # Add desync frame
-    # 20th bit is desync flag
-    bitstream += bytes.fromhex("00100000")
+    # Add desync frame (bit 20 is the desync flag)
+    bitstream += bytes.fromhex(DESYNC_FRAME_HEX)
     return bitstream
 
 
