@@ -32,9 +32,6 @@ except ImportError:
 
 # Bitstream format constants
 
-BORDER_ROWS: int = 2
-"""Number of border rows (top + bottom) that carry no bitstream content."""
-
 COLUMN_INDEX_BITS: int = 5
 """Bits used to encode the column index inside the frame-select word."""
 
@@ -267,7 +264,7 @@ def _compute_grid_size(tile_bits: dict) -> tuple:
         num_rows = max(int(coords_match.group(2)) + 1, num_rows)
     return num_columns, num_rows
 
-def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, legacy: bool = True) -> tuple:
+def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, include_border_rows: bool = False) -> tuple:
     """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings.
 
     Produces one `` `define`` macro per non-NULL tile for Verilog and one
@@ -285,8 +282,8 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, legacy: bool = 
         Bitstream specification dictionary.  Must contain ``ArchSpecs``
         (``FrameBitsPerRow``, ``MaxFramesPerCol``), ``TileMap``, and
         ``FrameMap``.
-    legacy : bool, optional
-        default ``True``: skip tiles in the first and last row
+    include_border_rows : bool, optional
+        When ``True``, include tiles in the first and last row.  Default ``False``.
 
     Returns
     -------
@@ -304,7 +301,7 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, legacy: bool = 
     )
     for tile_key, bits in tile_bits_no_mask.items():
         tile_type = spec_dict["TileMap"][tile_key]
-        if tile_type == "NULL" or (len(spec_dict["FrameMap"][tile_type]) == 0 and legacy):
+        if tile_type == "NULL" or (len(spec_dict["FrameMap"][tile_type]) == 0 and not include_border_rows):
             continue
 
         verilog_str += f"// {tile_key}, {tile_type}\n"
@@ -329,7 +326,7 @@ def _build_csv_and_frame_data(
     spec_dict: dict,
     num_rows: int,
     num_columns: int,
-    legacy: bool = True,
+    include_border_rows: bool = False,
 ) -> tuple:
     """Build the CSV output string and the per-column frame byte arrays.
 
@@ -351,9 +348,9 @@ def _build_csv_and_frame_data(
         Total number of rows in the grid (from ``_compute_grid_size``).
     num_columns : int
         Total number of columns in the grid (from ``_compute_grid_size``).
-    legacy : bool, optional
-        When ``True`` (default), skip the first and last row (FABulous 1.0
-        behaviour).  When ``False``, include all rows.
+    include_border_rows : bool, optional
+        When ``True``, include the first and last row.  Default ``False``
+        (FABulous 1.0 behaviour: skip border rows).
 
     Returns
     -------
@@ -368,13 +365,13 @@ def _build_csv_and_frame_data(
     csv_str = ""
     bit_array = [[b"" for _ in range(max_frames_per_col)] for _ in range(num_columns)]
 
-    if legacy:
-        logger.info("Legacy FABulous 1.0 bitstream generation enabled.")
-        start_row = num_rows - BORDER_ROWS
-        stop_row = 0
-    else:
+    if include_border_rows:
         start_row = num_rows - 1
         stop_row = -1
+    else:
+        logger.info("Legacy FABulous 1.0 bitstream generation enabled.")
+        start_row = num_rows - 2
+        stop_row = 0
 
     for y in range(start_row, stop_row, -1):
         for x in range(num_columns):
@@ -489,14 +486,14 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     with Path(spec_file).open("rb") as f:
         spec_dict = pickle.load(f)
 
-    legacy = spec_dict.get("legacy", True)
+    include_border_rows = spec_dict.get("include_border_rows", False)
 
     tile_bits, tile_bits_no_mask = _init_tile_bits(spec_dict)
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
-    verilog_str, vhdl_str = _build_hdl_strings(tile_bits_no_mask, spec_dict, legacy)
-    csv_str, bit_array = _build_csv_and_frame_data(tile_bits, spec_dict, num_rows, num_columns, legacy)
+    verilog_str, vhdl_str = _build_hdl_strings(tile_bits_no_mask, spec_dict, include_border_rows)
+    csv_str, bit_array = _build_csv_and_frame_data(tile_bits, spec_dict, num_rows, num_columns, include_border_rows)
     bitstream_bytes = _build_binary_bitstream(bit_array, num_columns)
 
     # Note - format in output file is line by line:
