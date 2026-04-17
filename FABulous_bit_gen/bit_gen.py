@@ -52,6 +52,7 @@ DESYNC_FRAME: bytes = (1 << DESYNC_BIT).to_bytes(
 )
 """FABulous 4-byte desync frame: bit ``DESYNC_BIT`` set in a big-endian 32-bit word."""
 
+
 def bitstring_to_bytes(s: str) -> bytes:
     """Convert binary string to bytes.
 
@@ -66,6 +67,7 @@ def bitstring_to_bytes(s: str) -> bytes:
         Byte representation of the binary string
     """
     return int(s, 2).to_bytes(math.ceil(len(s) / 8), byteorder="big")
+
 
 def _parse_fasm_to_canon_list(fasm_file: str) -> list:
     """Parse a FASM file and return its canonicalised feature list.
@@ -92,6 +94,7 @@ def _parse_fasm_to_canon_list(fasm_file: str) -> list:
     fasm_lines = parse_fasm_filename(fasm_file)
     canonical_str = fasm_tuple_to_string(fasm_lines, True)
     return list(parse_fasm_string(canonical_str))
+
 
 def _init_tile_bits(spec_dict: dict) -> tuple:
     """Initialise per-tile bit arrays to all zeros.
@@ -124,6 +127,7 @@ def _init_tile_bits(spec_dict: dict) -> tuple:
     tile_bits = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     tile_bits_no_mask = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     return tile_bits, tile_bits_no_mask
+
 
 def _apply_fasm_features(
     canon_list: list,
@@ -199,7 +203,9 @@ def _apply_fasm_features(
         tile_type = spec_dict["TileMap"][tile_loc]
         if feature_name in spec_dict["TileSpecs"][tile_loc]:
             if spec_dict["TileSpecs"][tile_loc][feature_name]:
-                for bit_idx, bit_val in spec_dict["TileSpecs"][tile_loc][feature_name].items():
+                for bit_idx, bit_val in spec_dict["TileSpecs"][tile_loc][
+                    feature_name
+                ].items():
                     new_val = int(bit_val)
                     if bit_idx in touched_bits[tile_loc]:
                         logger.warning(
@@ -210,7 +216,9 @@ def _apply_fasm_features(
                         )
                     touched_bits[tile_loc].add(bit_idx)
                     tile_bits[tile_loc][bit_idx] = new_val
-                for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][feature_name].items():
+                for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][
+                    feature_name
+                ].items():
                     new_val = int(bit_val)
                     if bit_idx in touched_bits_no_mask[tile_loc]:
                         logger.warning(
@@ -228,6 +236,7 @@ def _apply_fasm_features(
                 f"Feature: {feature_name}\n"
                 "found in fasm file was not found in the bitstream spec"
             )
+
 
 def _compute_grid_size(tile_bits: dict) -> tuple:
     """Compute grid dimensions from tile coordinate keys.
@@ -264,7 +273,10 @@ def _compute_grid_size(tile_bits: dict) -> tuple:
         num_rows = max(int(coords_match.group(2)) + 1, num_rows)
     return num_columns, num_rows
 
-def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, include_border_rows: bool = False) -> tuple:
+
+def _build_hdl_strings(
+    tile_bits_no_mask: dict, spec_dict: dict, include_border_rows: bool = False
+) -> tuple:
     """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings.
 
     Produces one `` `define`` macro per non-NULL tile for Verilog and one
@@ -301,7 +313,9 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, include_border_
     )
     for tile_key, bits in tile_bits_no_mask.items():
         tile_type = spec_dict["TileMap"][tile_key]
-        if tile_type == "NULL" or (len(spec_dict["FrameMap"][tile_type]) == 0 and not include_border_rows):
+        if tile_type == "NULL" or (
+            len(spec_dict["FrameMap"][tile_type]) == 0 and not include_border_rows
+        ):
             continue
 
         verilog_str += f"// {tile_key}, {tile_type}\n"
@@ -320,6 +334,7 @@ def _build_hdl_strings(tile_bits_no_mask: dict, spec_dict: dict, include_border_
         vhdl_str += '";\n'
     vhdl_str += "end package emulate_bitstream;"
     return verilog_str, vhdl_str
+
 
 def _build_csv_and_frame_data(
     tile_bits: dict,
@@ -376,7 +391,9 @@ def _build_csv_and_frame_data(
     for y in range(start_row, stop_row, -1):
         for x in range(num_columns):
             tile_key = f"X{x}Y{y}"
-            tile_csv = ",".join((tile_key, spec_dict["TileMap"][tile_key], str(x), str(y)))
+            tile_csv = ",".join(
+                (tile_key, spec_dict["TileMap"][tile_key], str(x), str(y))
+            )
             tile_csv += "\n"
 
             for frame_idx in range(max_frames_per_col):
@@ -385,15 +402,19 @@ def _build_csv_and_frame_data(
                 else:
                     start = frame_bits_per_row * frame_idx
                     frame_bit_row = "".join(
-                        map(str, tile_bits[tile_key][start : start + frame_bits_per_row])
+                        map(
+                            str, tile_bits[tile_key][start : start + frame_bits_per_row]
+                        )
                     )[::-1]
 
-                tile_csv += ",".join((
-                    f"frame{frame_idx}",
-                    str(frame_idx),
-                    str(frame_bits_per_row),
-                    frame_bit_row,
-                ))
+                tile_csv += ",".join(
+                    (
+                        f"frame{frame_idx}",
+                        str(frame_idx),
+                        str(frame_bits_per_row),
+                        frame_bit_row,
+                    )
+                )
                 tile_csv += "\n"
 
                 bit_array[x][frame_idx] += bitstring_to_bytes(frame_bit_row)
@@ -401,6 +422,7 @@ def _build_csv_and_frame_data(
             csv_str += tile_csv + "\n"
 
     return csv_str, bit_array
+
 
 def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
     """Assemble the final binary bitstream from per-column frame data.
@@ -444,6 +466,7 @@ def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
     # Add desync frame (bit DESYNC_BIT is the desync flag)
     bitstream += DESYNC_FRAME
     return bitstream
+
 
 def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     """Generate the bitstream from the FASM file using the bitstream specification.
@@ -492,8 +515,12 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
-    verilog_str, vhdl_str = _build_hdl_strings(tile_bits_no_mask, spec_dict, include_border_rows)
-    csv_str, bit_array = _build_csv_and_frame_data(tile_bits, spec_dict, num_rows, num_columns, include_border_rows)
+    verilog_str, vhdl_str = _build_hdl_strings(
+        tile_bits_no_mask, spec_dict, include_border_rows
+    )
+    csv_str, bit_array = _build_csv_and_frame_data(
+        tile_bits, spec_dict, num_rows, num_columns, include_border_rows
+    )
     bitstream_bytes = _build_binary_bitstream(bit_array, num_columns)
 
     # Note - format in output file is line by line:
@@ -511,6 +538,7 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     # Write out binary representation
     with output_path.open("bw+") as f:
         f.write(bitstream_bytes)
+
 
 #####################################################################################
 # Main
@@ -537,6 +565,7 @@ def bit_gen() -> None:
         genBitstream(args.fasm_file, args.spec_file, args.output_file)
     else:
         parser.print_help()
+
 
 if __name__ == "__main__":
     bit_gen()

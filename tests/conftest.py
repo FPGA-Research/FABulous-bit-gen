@@ -3,14 +3,14 @@
 import pickle
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
-
 from fasm import FasmLine, SetFasmFeature
 
 
 @pytest.fixture
-def minimal_spec_dict():
+def minimal_spec_dict() -> dict[str, Any]:
     """Minimal spec dict for unit tests.
 
     Tiles: X0Y0 (NULL - bottom), X0Y1 (W_IO), X1Y1 (LUT4AB), X0Y2 (NULL - top)
@@ -20,7 +20,6 @@ def minimal_spec_dict():
     """
     MaxFramesPerCol = 20
     FrameBitsPerRow = 32
-    total_bits = MaxFramesPerCol * FrameBitsPerRow
 
     return {
         "ArchSpecs": {
@@ -70,19 +69,19 @@ def minimal_spec_dict():
 
 
 @pytest.fixture
-def temp_output_dir(tmp_path):
+def temp_output_dir(tmp_path: Path) -> Path:
     """Temporary directory for test outputs, auto-cleanup after test."""
     return tmp_path
 
 
 @pytest.fixture(scope="session")
-def test_data_dir():
+def test_data_dir() -> Path:
     """Path to test data directory."""
     return Path(__file__).parent / "test_data"
 
 
 @pytest.fixture(scope="session")
-def real_spec_dict(test_data_dir):
+def real_spec_dict(test_data_dir: Path) -> dict[str, Any]:
     """Load real bitstream spec from test data (shared across all designs)."""
     spec_file = test_data_dir / "bitStreamSpec.bin"
     with spec_file.open("rb") as f:
@@ -97,7 +96,7 @@ _DESIGNS = [
 
 
 @pytest.fixture(scope="session", params=_DESIGNS)
-def design(request, test_data_dir):
+def design(request: pytest.FixtureRequest, test_data_dir: Path) -> SimpleNamespace:
     """Parametrized fixture yielding paths for each test design.
 
     Yields a SimpleNamespace with:
@@ -122,7 +121,7 @@ def design(request, test_data_dir):
 
 
 @pytest.fixture
-def synthetic_fasm_lines():
+def synthetic_fasm_lines() -> list[FasmLine]:
     """Synthetic FASM lines for unit testing.
 
     Returns list of FasmLine objects with set_features.
@@ -165,7 +164,7 @@ def synthetic_fasm_lines():
 
 
 @pytest.fixture
-def synthetic_fasm_lines_with_clk():
+def synthetic_fasm_lines_with_clk() -> list[FasmLine]:
     """FASM lines including CLK feature (should be filtered)."""
     return [
         FasmLine(
@@ -194,7 +193,7 @@ def synthetic_fasm_lines_with_clk():
 
 
 @pytest.fixture
-def synthetic_fasm_lines_invalid_tile():
+def synthetic_fasm_lines_invalid_tile() -> list[FasmLine]:
     """FASM lines with invalid tile location."""
     return [
         FasmLine(

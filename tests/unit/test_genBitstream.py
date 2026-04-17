@@ -3,13 +3,12 @@
 import pickle
 import re
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
-
-from FABulous_bit_gen.bit_gen import bitstring_to_bytes, genBitstream
-from FABulous_bit_gen.custom_exception import SpecMissMatch
 from fasm import FasmLine, SetFasmFeature
+
+from FABulous_bit_gen.bit_gen import genBitstream
+from FABulous_bit_gen.custom_exception import SpecMissMatch
 
 
 class TestGenBitstreamInitialization:
@@ -17,7 +16,7 @@ class TestGenBitstreamInitialization:
 
     def test_initializes_tile_dicts_with_zeros(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Verify tileDict initialized with zeros for each tile."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -37,7 +36,7 @@ class TestGenBitstreamInitialization:
 
     def test_grid_dimensions_calculated_correctly(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Test that grid dimensions are extracted from TileMap coordinates."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -74,7 +73,12 @@ class TestGenBitstreamInitialization:
 class TestGenBitstreamFasmProcessing:
     """Tests for FASM line processing."""
 
-    def test_clk_feature_filtered_out(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_clk_feature_filtered_out(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """CLK features should be skipped during processing."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -116,7 +120,7 @@ class TestGenBitstreamFasmProcessing:
             return_value="canonical_string",
         )
 
-        def mock_parse_fasm_string(s):
+        def mock_parse_fasm_string(_s):
             return fasm_lines
 
         mocker.patch(
@@ -135,12 +139,13 @@ class TestGenBitstreamFasmProcessing:
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
-        # Valid feature was processed; CLK feature filtered (would raise SpecMissMatch if not)
+        # Valid feature was processed; CLK feature filtered
+        # (would raise SpecMissMatch if not filtered)
         assert "X0Y1" in csv_content
 
     def test_valid_feature_sets_bits_in_tile(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Valid features should set bits in tileDict."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -190,7 +195,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_multiple_features_same_tile(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Multiple features for same tile should all be processed."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -250,7 +255,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_multiple_features_different_tiles(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Features for different tiles should update both."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -309,7 +314,12 @@ class TestGenBitstreamFasmProcessing:
         assert "X0Y1" in csv_content
         assert "X1Y1" in csv_content
 
-    def test_feature_with_value_1(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_feature_with_value_1(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Feature with value=1 should set bit to 1."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -355,7 +365,12 @@ class TestGenBitstreamFasmProcessing:
         csv_path = output_file.with_suffix(".csv")
         assert csv_path.exists()
 
-    def test_feature_with_value_0(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_feature_with_value_0(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Feature with value=0 should set bit to 0."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -403,7 +418,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_empty_fasm_produces_zero_bitstream(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Empty FASM should produce bitstream with all zeros."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -423,7 +438,10 @@ class TestGenBitstreamFasmProcessing:
         assert "frame0" in csv_content
 
     def _overlapping_spec(self):
-        """Shared spec for overwrite-warning tests: FEAT.A and FEAT.B both map to bit 50."""
+        """Shared spec for overwrite-warning tests.
+
+        FEAT.A and FEAT.B both map to bit 50.
+        """
         return {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
             "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
@@ -451,7 +469,10 @@ class TestGenBitstreamFasmProcessing:
         }
 
     def _run_with_features(self, features, spec_dict, temp_output_dir, mocker):
-        """Helper: run genBitstream with a given list of feature strings and return mock_logger."""
+        """Run genBitstream with a given list of feature strings.
+
+        Returns mock_logger.
+        """
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -459,7 +480,11 @@ class TestGenBitstreamFasmProcessing:
         fasm_lines = [
             FasmLine(
                 set_feature=SetFasmFeature(
-                    feature=f, start=None, end=None, value=1, value_format=None,
+                    feature=f,
+                    start=None,
+                    end=None,
+                    value=1,
+                    value_format=None,
                 ),
                 annotations=None,
                 comment=None,
@@ -470,9 +495,15 @@ class TestGenBitstreamFasmProcessing:
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines)
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines)
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
         mocker.patch(
             "FABulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=lambda f: f.feature,
@@ -482,11 +513,11 @@ class TestGenBitstreamFasmProcessing:
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
         return mock_logger
 
-    def test_overlapping_features_emit_warning(self, temp_output_dir, mocker):
+    def test_overlapping_features_emit_warning(self, temp_output_dir, mocker) -> None:
         """Two features mapping to the same bit index should trigger a logger warning.
 
-        Both TileSpecs (masked) and TileSpecs_No_Mask (unmasked) overlap at
-        bit 50, so two warnings are expected: one per bitstream.
+        Both TileSpecs (masked) and TileSpecs_No_Mask (unmasked) overlap at bit 50, so
+        two warnings are expected: one per bitstream.
         """
         mock_logger = self._run_with_features(
             ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
@@ -501,13 +532,17 @@ class TestGenBitstreamFasmProcessing:
             assert "X0Y1" in warning_msg
             assert "50" in warning_msg
 
-    def test_overlapping_zero_valued_bit_emits_warning(self, temp_output_dir, mocker):
+    def test_overlapping_zero_valued_bit_emits_warning(
+        self,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Overwrite of a zero-valued bit must still warn.
 
-        A feature can map a bit to value '0'. Since tile_bits is initialised
-        to all zeros, a value-based sentinel (old != 0) would miss this case.
-        The touched_bits tracker must detect it regardless of the stored value.
-        Both TileSpecs and TileSpecs_No_Mask overlap, so two warnings are expected.
+        A feature can map a bit to value '0'. Since tile_bits is initialised to all
+        zeros, a value-based sentinel (old != 0) would miss this case. The touched_bits
+        tracker must detect it regardless of the stored value. Both TileSpecs and
+        TileSpecs_No_Mask overlap, so two warnings are expected.
         """
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -515,8 +550,8 @@ class TestGenBitstreamFasmProcessing:
             "TileSpecs": {
                 "X0Y0": {},
                 "X0Y1": {
-                    "FEAT.A": {50: "0"},   # explicitly writes 0 to bit 50
-                    "FEAT.B": {50: "1"},   # then overwrites bit 50 with 1
+                    "FEAT.A": {50: "0"},  # explicitly writes 0 to bit 50
+                    "FEAT.B": {50: "1"},  # then overwrites bit 50 with 1
                 },
                 "X0Y2": {},
             },
@@ -548,12 +583,16 @@ class TestGenBitstreamFasmProcessing:
             assert "X0Y1" in warning_msg
             assert "50" in warning_msg
 
-    def test_no_mask_only_overlap_emits_one_warning(self, temp_output_dir, mocker):
+    def test_no_mask_only_overlap_emits_one_warning(
+        self,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Overlap only in TileSpecs_No_Mask should warn exactly once (unmasked path).
 
-        TileSpecs (masked) maps each feature to a distinct bit, so no masked
-        warning fires.  TileSpecs_No_Mask maps both features to bit 50, which
-        triggers the unmasked overwrite warning.
+        TileSpecs (masked) maps each feature to a distinct bit, so no masked warning
+        fires.  TileSpecs_No_Mask maps both features to bit 50, which triggers the
+        unmasked overwrite warning.
         """
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -561,7 +600,7 @@ class TestGenBitstreamFasmProcessing:
             "TileSpecs": {
                 "X0Y0": {},
                 "X0Y1": {
-                    "FEAT.A": {50: "1"},   # masked: distinct bits, no conflict
+                    "FEAT.A": {50: "1"},  # masked: distinct bits, no conflict
                     "FEAT.B": {51: "1"},
                 },
                 "X0Y2": {},
@@ -569,7 +608,7 @@ class TestGenBitstreamFasmProcessing:
             "TileSpecs_No_Mask": {
                 "X0Y0": {},
                 "X0Y1": {
-                    "FEAT.A": {50: "1"},   # unmasked: both write to bit 50
+                    "FEAT.A": {50: "1"},  # unmasked: both write to bit 50
                     "FEAT.B": {50: "1"},
                 },
                 "X0Y2": {},
@@ -594,12 +633,16 @@ class TestGenBitstreamFasmProcessing:
         assert "X0Y1" in warning_msg
         assert "50" in warning_msg
 
-    def test_masked_only_overlap_emits_one_warning(self, temp_output_dir, mocker):
+    def test_masked_only_overlap_emits_one_warning(
+        self,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Overlap only in TileSpecs (masked) should warn exactly once (masked path).
 
-        TileSpecs_No_Mask maps each feature to a distinct bit, so no unmasked
-        warning fires.  TileSpecs maps both features to bit 50, triggering the
-        masked overwrite warning.
+        TileSpecs_No_Mask maps each feature to a distinct bit, so no unmasked warning
+        fires.  TileSpecs maps both features to bit 50, triggering the masked overwrite
+        warning.
         """
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -607,7 +650,7 @@ class TestGenBitstreamFasmProcessing:
             "TileSpecs": {
                 "X0Y0": {},
                 "X0Y1": {
-                    "FEAT.A": {50: "1"},   # masked: both write to bit 50
+                    "FEAT.A": {50: "1"},  # masked: both write to bit 50
                     "FEAT.B": {50: "1"},
                 },
                 "X0Y2": {},
@@ -615,7 +658,7 @@ class TestGenBitstreamFasmProcessing:
             "TileSpecs_No_Mask": {
                 "X0Y0": {},
                 "X0Y1": {
-                    "FEAT.A": {50: "1"},   # unmasked: distinct bits, no conflict
+                    "FEAT.A": {50: "1"},  # unmasked: distinct bits, no conflict
                     "FEAT.B": {51: "1"},
                 },
                 "X0Y2": {},
@@ -640,23 +683,41 @@ class TestGenBitstreamFasmProcessing:
         assert "X0Y1" in warning_msg
         assert "50" in warning_msg
 
-    def test_non_overlapping_features_emit_no_warning(self, temp_output_dir, mocker):
-        """Features that write to distinct bit indices should not trigger any warning."""
+    def test_non_overlapping_features_emit_no_warning(
+        self,
+        temp_output_dir,
+        mocker,
+    ) -> None:
+        """Features that write to distinct bit indices should not trigger any
+        warning."""
         mock_logger = self._run_with_features(
             ["X0Y1.W2MID7.A_I", "X0Y1.GND0.A_T"],
             {
                 "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-                "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X1Y1": "LUT4AB", "X0Y2": "NULL", "X1Y2": "NULL"},
+                "TileMap": {
+                    "X0Y0": "NULL",
+                    "X0Y1": "W_IO",
+                    "X1Y1": "LUT4AB",
+                    "X0Y2": "NULL",
+                    "X1Y2": "NULL",
+                },
                 "TileSpecs": {
                     "X0Y1": {"W2MID7.A_I": {110: "1", 111: "0"}, "GND0.A_T": {50: "1"}},
-                    "X1Y1": {}, "X0Y0": {}, "X0Y2": {}, "X1Y2": {},
+                    "X1Y1": {},
+                    "X0Y0": {},
+                    "X0Y2": {},
+                    "X1Y2": {},
                 },
                 "TileSpecs_No_Mask": {
                     "X0Y1": {"W2MID7.A_I": {110: "1", 111: "0"}, "GND0.A_T": {50: "1"}},
-                    "X1Y1": {}, "X0Y0": {}, "X0Y2": {}, "X1Y2": {},
+                    "X1Y1": {},
+                    "X0Y0": {},
+                    "X0Y2": {},
+                    "X1Y2": {},
                 },
                 "FrameMap": {
-                    "NULL": {}, "W_IO": {0: "11111111111111111111111111111111"},
+                    "NULL": {},
+                    "W_IO": {0: "11111111111111111111111111111111"},
                     "LUT4AB": {0: "00000001111111111111111111111011"},
                 },
                 "FrameMapEncode": {},
@@ -673,7 +734,7 @@ class TestGenBitstreamErrorHandling:
 
     def test_tile_location_not_in_spec_raises_specmissmatch(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Invalid tile location should raise SpecMissMatch."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -721,7 +782,7 @@ class TestGenBitstreamErrorHandling:
 
     def test_feature_not_in_tile_specs_raises_specmissmatch(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Invalid feature for valid tile should raise SpecMissMatch."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -769,7 +830,7 @@ class TestGenBitstreamErrorHandling:
 
     def test_specmissmatch_error_message_format(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """SpecMissMatch should include tile type, location, and feature."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -821,7 +882,7 @@ class TestGenBitstreamErrorHandling:
 class TestGenBitstreamFaultCases:
     """Tests for fault cases and error conditions."""
 
-    def test_spec_file_not_found(self, temp_output_dir, mocker):
+    def test_spec_file_not_found(self, temp_output_dir, mocker) -> None:
         """Missing spec file should raise FileNotFoundError."""
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -836,7 +897,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(FileNotFoundError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_fasm_file_not_found(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_fasm_file_not_found(self, minimal_spec_dict, temp_output_dir) -> None:
         """Missing FASM file should raise FileNotFoundError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "nonexistent.fasm"
@@ -848,7 +909,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(FileNotFoundError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_corrupted_pickle_spec_file(self, temp_output_dir, mocker):
+    def test_corrupted_pickle_spec_file(self, temp_output_dir, mocker) -> None:
         """Corrupted pickle file should raise pickle.UnpicklingError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -862,10 +923,10 @@ class TestGenBitstreamFaultCases:
         mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(Exception):
+        with pytest.raises(pickle.UnpicklingError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_empty_spec_dict(self, temp_output_dir, mocker):
+    def test_empty_spec_dict(self, temp_output_dir, mocker) -> None:
         """Empty spec dict should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -882,7 +943,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_spec_dict_missing_archspecs(self, temp_output_dir, mocker):
+    def test_spec_dict_missing_archspecs(self, temp_output_dir, mocker) -> None:
         """Spec dict missing ArchSpecs should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -906,7 +967,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_spec_dict_missing_tilemap(self, temp_output_dir, mocker):
+    def test_spec_dict_missing_tilemap(self, temp_output_dir, mocker) -> None:
         """Spec dict missing TileMap should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -930,7 +991,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_spec_dict_missing_tilespecs(self, temp_output_dir, mocker):
+    def test_spec_dict_missing_tilespecs(self, temp_output_dir, mocker) -> None:
         """Spec dict missing TileSpecs should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -954,7 +1015,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_spec_dict_missing_framemap(self, temp_output_dir, mocker):
+    def test_spec_dict_missing_framemap(self, temp_output_dir, mocker) -> None:
         """Spec dict missing FrameMap should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -978,7 +1039,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_archspecs_missing_maxframespercol(self, temp_output_dir, mocker):
+    def test_archspecs_missing_maxframespercol(self, temp_output_dir, mocker) -> None:
         """ArchSpecs missing MaxFramesPerCol should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1003,7 +1064,7 @@ class TestGenBitstreamFaultCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_archspecs_missing_framebitsperrow(self, temp_output_dir, mocker):
+    def test_archspecs_missing_framebitsperrow(self, temp_output_dir, mocker) -> None:
         """ArchSpecs missing FrameBitsPerRow should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1030,7 +1091,7 @@ class TestGenBitstreamFaultCases:
 
     def test_feature_with_insufficient_parts(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Feature with less than 3 parts should raise IndexError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1076,8 +1137,9 @@ class TestGenBitstreamFaultCases:
 
     def test_tile_coord_invalid_format(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
-        """Tile coordinate that doesn't match X\\d*Y\\d* pattern causes AttributeError."""
+    ) -> None:
+        """Tile coordinate that doesn't match X\\d*Y\\d* pattern causes
+        AttributeError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -1103,7 +1165,7 @@ class TestGenBitstreamEdgeCases:
 
     def test_feature_name_with_more_than_three_parts(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Feature with 4+ parts should only use first 3."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1152,7 +1214,7 @@ class TestGenBitstreamEdgeCases:
 
     def test_feature_containing_clk_substring(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Feature containing 'CLK' substring should be filtered."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1199,7 +1261,7 @@ class TestGenBitstreamEdgeCases:
         # CLK-substring feature filtered (would raise SpecMissMatch if not)
         assert "X0Y1" in csv_content
 
-    def test_large_grid_dimensions(self, temp_output_dir, mocker):
+    def test_large_grid_dimensions(self, temp_output_dir, mocker) -> None:
         """Test with large grid (many tiles)."""
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -1229,12 +1291,13 @@ class TestGenBitstreamEdgeCases:
 
     def test_tile_with_leading_zeros_in_coords_causes_error(
         self, temp_output_dir, mocker
-    ):
-        """Tile coordinates with leading zeros cause KeyError due to coordinate reconstruction.
+    ) -> None:
+        """Tile coordinates with leading zeros cause KeyError due to coordinate
+        reconstruction.
 
         The code calculates grid dimensions from regex match, then reconstructs tile
-        coordinates like "X0Y1" from those dimensions. If tiles are named "X01Y01",
-        the reconstructed names won't match.
+        coordinates like "X0Y1" from those dimensions. If tiles are named "X01Y01", the
+        reconstructed names won't match.
         """
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -1261,7 +1324,7 @@ class TestGenBitstreamEdgeCases:
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_single_column_grid(self, temp_output_dir, mocker):
+    def test_single_column_grid(self, temp_output_dir, mocker) -> None:
         """Grid with single column should work."""
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -1287,7 +1350,7 @@ class TestGenBitstreamEdgeCases:
 
         assert output_file.exists()
 
-    def test_feature_with_empty_bit_mapping(self, temp_output_dir, mocker):
+    def test_feature_with_empty_bit_mapping(self, temp_output_dir, mocker) -> None:
         """Feature with empty bit mapping dictionary should not crash."""
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -1341,7 +1404,7 @@ class TestGenBitstreamEdgeCases:
 
         assert output_file.exists()
 
-    def test_bit_index_at_boundary(self, temp_output_dir, mocker):
+    def test_bit_index_at_boundary(self, temp_output_dir, mocker) -> None:
         """Bit index at MaxFramesPerCol * FrameBitsPerRow - 1 should work."""
         max_index = 20 * 32 - 1
         spec_dict = {
@@ -1396,7 +1459,12 @@ class TestGenBitstreamEdgeCases:
 
         assert output_file.exists()
 
-    def test_output_path_with_spaces(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_output_path_with_spaces(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Output path with spaces should work."""
         spec_file = temp_output_dir / "spec.bin"
         output_dir = temp_output_dir / "output with spaces"
@@ -1416,10 +1484,15 @@ class TestGenBitstreamEdgeCases:
 
         assert output_file.exists()
 
-    def test_relative_path_output(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_relative_path_output(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Relative output path should work."""
         spec_file = temp_output_dir / "spec.bin"
-        output_file = temp_output_dir / "output.bin"
+        temp_output_dir / "output.bin"
 
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
@@ -1442,7 +1515,7 @@ class TestGenBitstreamNullTileHandling:
 
     def test_null_tile_frame_bits_all_zeros(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """NULL tiles should produce zero frame bits."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1466,7 +1539,7 @@ class TestGenBitstreamNullTileHandling:
 
     def test_null_tile_not_in_hdl_output(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """NULL tiles should not appear in HDL output."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1493,7 +1566,11 @@ class TestGenBitstreamNullTileHandling:
 class TestGenBitstreamFrameMap:
     """Tests for FrameMap handling."""
 
-    def test_tile_with_empty_framemap_skipped_in_hdl(self, temp_output_dir, mocker):
+    def test_tile_with_empty_framemap_skipped_in_hdl(
+        self,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Tiles with empty FrameMap should be skipped in HDL output."""
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -1523,7 +1600,7 @@ class TestGenBitstreamFrameMap:
 
     def test_non_empty_framemap_tile_included_in_hdl(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Tiles with non-empty FrameMap should appear in HDL output."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1547,7 +1624,7 @@ class TestGenBitstreamFrameMap:
 class TestGenBitstreamCsvOutput:
     """Tests for CSV output generation."""
 
-    def test_csv_file_created(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_csv_file_created(self, minimal_spec_dict, temp_output_dir, mocker) -> None:
         """CSV file should be created."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1565,7 +1642,12 @@ class TestGenBitstreamCsvOutput:
         csv_path = output_file.with_suffix(".csv")
         assert csv_path.exists()
 
-    def test_csv_tile_line_format(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_csv_tile_line_format(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """CSV tile lines should have format: tileLoc,tileType,x,y."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1585,7 +1667,12 @@ class TestGenBitstreamCsvOutput:
 
         assert "X0Y1,W_IO,0,1" in csv_content
 
-    def test_csv_frame_line_format(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_csv_frame_line_format(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """CSV frame lines should have format: frameN,n,32,bits."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1605,7 +1692,12 @@ class TestGenBitstreamCsvOutput:
 
         assert "frame0,0,32," in csv_content
 
-    def test_csv_row_order_reversed(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_csv_row_order_reversed(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Rows in CSV should be processed from num_rows-2 down to 1."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1637,7 +1729,12 @@ class TestGenBitstreamCsvOutput:
 class TestGenBitstreamVhdlOutput:
     """Tests for VHDL output generation."""
 
-    def test_vhdl_file_created(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_vhdl_file_created(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """VHDL file should be created."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1655,7 +1752,12 @@ class TestGenBitstreamVhdlOutput:
         vhd_path = output_file.with_suffix(".vhd")
         assert vhd_path.exists()
 
-    def test_vhdl_package_header(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_vhdl_package_header(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """VHDL file should contain IEEE library and package declaration."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1676,7 +1778,12 @@ class TestGenBitstreamVhdlOutput:
         assert "library IEEE" in vhd_content
         assert "package emulate_bitstream" in vhd_content
 
-    def test_vhdl_constant_format(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_vhdl_constant_format(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """VHDL constants should have correct format."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1701,7 +1808,12 @@ class TestGenBitstreamVhdlOutput:
 class TestGenBitstreamVerilogOutput:
     """Tests for Verilog output generation."""
 
-    def test_verilog_file_created(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_verilog_file_created(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Verilog file should be created."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1719,7 +1831,12 @@ class TestGenBitstreamVerilogOutput:
         vh_path = output_file.with_suffix(".vh")
         assert vh_path.exists()
 
-    def test_verilog_define_format(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_verilog_define_format(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Verilog defines should have correct format."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1742,7 +1859,7 @@ class TestGenBitstreamVerilogOutput:
 
     def test_verilog_bit_order_reversed(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Verilog output should have bits in reverse order."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1768,7 +1885,7 @@ class TestGenBitstreamNoneSetFeature:
 
     def test_fasm_line_with_none_set_feature_is_skipped(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """FasmLine with set_feature=None should be silently skipped."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1818,7 +1935,7 @@ class TestGenBitstreamNoneSetFeature:
 
     def test_all_none_set_features_produces_zero_bitstream(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """FASM with only None set_features (comments only) should succeed."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1853,7 +1970,7 @@ class TestGenBitstreamCsvRowBoundaries:
 
     def test_bottom_row_absent_from_csv(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Y0 (bottom row) should not appear in CSV output."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1869,11 +1986,18 @@ class TestGenBitstreamCsvRowBoundaries:
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
-        tile_lines = [l for l in csv_content.splitlines() if l.startswith("X")]
+        tile_lines = [
+            line_ for line_ in csv_content.splitlines() if line_.startswith("X")
+        ]
         assert tile_lines, "CSV contained no tile lines"
-        assert all("Y0" not in l for l in tile_lines)
+        assert all("Y0" not in line_ for line_ in tile_lines)
 
-    def test_top_row_absent_from_csv(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_top_row_absent_from_csv(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Y{max} (top row) should not appear in CSV output."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1889,10 +2013,12 @@ class TestGenBitstreamCsvRowBoundaries:
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
-        tile_lines = [l for l in csv_content.splitlines() if l.startswith("X")]
+        tile_lines = [
+            line_ for line_ in csv_content.splitlines() if line_.startswith("X")
+        ]
         assert tile_lines, "CSV contained no tile lines"
         # minimal_spec_dict has Y2 as max row
-        assert all("Y2" not in l for l in tile_lines)
+        assert all("Y2" not in line_ for line_ in tile_lines)
 
 
 class TestGenBitstreamSpecInconsistency:
@@ -1900,8 +2026,9 @@ class TestGenBitstreamSpecInconsistency:
 
     def test_feature_missing_from_tilespecs_no_mask_raises_keyerror(
         self, temp_output_dir, mocker
-    ):
-        """Feature in TileSpecs but absent from TileSpecs_No_Mask should raise KeyError."""
+    ) -> None:
+        """Feature in TileSpecs but absent from TileSpecs_No_Mask should raise
+        KeyError."""
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
             "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
@@ -1968,7 +2095,12 @@ class TestGenBitstreamSpecInconsistency:
 class TestGenBitstreamBinaryOutput:
     """Tests for binary output generation."""
 
-    def test_bitstream_file_created(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_bitstream_file_created(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Binary file should be created."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -1985,7 +2117,12 @@ class TestGenBitstreamBinaryOutput:
 
         assert output_file.exists()
 
-    def test_bitstream_header_bytes(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_bitstream_header_bytes(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Binary file should start with header bytes."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -2008,7 +2145,7 @@ class TestGenBitstreamBinaryOutput:
 
     def test_bitstream_desync_frame_appended(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Binary file should end with desync frame."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -2031,7 +2168,7 @@ class TestGenBitstreamBinaryOutput:
 
     def test_bitstream_frame_select_encoding(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """Frame select bits should be encoded correctly."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -2051,7 +2188,12 @@ class TestGenBitstreamBinaryOutput:
 
         assert len(content) > 20
 
-    def test_bitstream_total_size(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_bitstream_total_size(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Binary file size should match expected calculation."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -2077,7 +2219,12 @@ class TestGenBitstreamBinaryOutput:
 class TestGenBitstreamBitManipulation:
     """Tests for bit manipulation logic."""
 
-    def test_frame_bit_row_reversed(self, minimal_spec_dict, temp_output_dir, mocker):
+    def test_frame_bit_row_reversed(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
         """Frame bit row should be reversed in output."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -2105,7 +2252,7 @@ class TestGenBitstreamBitManipulation:
 
     def test_tile_specs_no_mask_used_for_hdl(
         self, minimal_spec_dict, temp_output_dir, mocker
-    ):
+    ) -> None:
         """HDL output should use TileSpecs_No_Mask data."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
