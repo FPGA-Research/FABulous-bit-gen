@@ -173,11 +173,6 @@ def _apply_fasm_features(
         If a feature is present in ``TileSpecs`` for a tile but absent from
         the corresponding ``TileSpecs_No_Mask`` entry.
     """
-    # NOTE: SOME OF THE FOLLOWING METHODS HAVE BEEN CHANGED DUE TO A MODIFIED BITSTREAM
-    # SPEC FORMAT
-    # Please bear in mind that the tilespecs are now mapped by
-    # tile loc and not by cell type
-
     # Track which bit indices have already been written for each tile so that
     # overwrites are detected regardless of the bit value (a feature can
     # legitimately map a bit to 0, making a value-based sentinel unreliable).
@@ -540,9 +535,6 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         f.write(bitstream_bytes)
 
 
-#####################################################################################
-# Main
-#####################################################################################
 def bit_gen() -> None:
     """Command-line entry point for bitstream generation."""
     parser = argparse.ArgumentParser(
