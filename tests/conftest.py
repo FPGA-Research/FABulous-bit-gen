@@ -2,6 +2,7 @@
 
 import pickle
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -81,47 +82,43 @@ def test_data_dir():
 
 
 @pytest.fixture(scope="session")
-def expected_output_dir(test_data_dir):
-    """Path to expected output files."""
-    return test_data_dir / "output"
-
-
-@pytest.fixture(scope="session")
 def real_spec_dict(test_data_dir):
-    """Load real bitstream spec from test data."""
+    """Load real bitstream spec from test data (shared across all designs)."""
     spec_file = test_data_dir / "bitStreamSpec.bin"
     with spec_file.open("rb") as f:
         return pickle.load(f)
 
 
-@pytest.fixture(scope="session")
-def real_fasm_path(test_data_dir):
-    """Path to real FASM file from test data."""
-    return test_data_dir / "sequential_16bit_en.fasm"
+_DESIGNS = [
+    "sequential_16bit_en",
+    "bouncy_spi_screen_standard_fab",
+    "bouncy_spi_screen_complex_dff_fab",
+]
 
 
-@pytest.fixture(scope="session")
-def real_expected_bin(expected_output_dir):
-    """Path to expected binary output."""
-    return expected_output_dir / "sequential_16bit_en.bin"
+@pytest.fixture(scope="session", params=_DESIGNS)
+def design(request, test_data_dir):
+    """Parametrized fixture yielding paths for each test design.
 
-
-@pytest.fixture(scope="session")
-def real_expected_csv(expected_output_dir):
-    """Path to expected CSV output."""
-    return expected_output_dir / "sequential_16bit_en.csv"
-
-
-@pytest.fixture(scope="session")
-def real_expected_vh(expected_output_dir):
-    """Path to expected Verilog output."""
-    return expected_output_dir / "sequential_16bit_en.vh"
-
-
-@pytest.fixture(scope="session")
-def real_expected_vhd(expected_output_dir):
-    """Path to expected VHDL output."""
-    return expected_output_dir / "sequential_16bit_en.vhd"
+    Yields a SimpleNamespace with:
+      - name        : design directory name
+      - fasm_path   : Path to the input FASM file
+      - reference   : SimpleNamespace with paths to reference outputs
+                      (.bin, .csv, .vh, .vhd); .hex only for bouncy designs
+    """
+    name = request.param
+    d = test_data_dir / name
+    ref = d / "reference"
+    return SimpleNamespace(
+        name=name,
+        fasm_path=d / "top.fasm",
+        reference=SimpleNamespace(
+            bin=ref / "top.bin",
+            csv=ref / "top.csv",
+            vh=ref / "top.vh",
+            vhd=ref / "top.vhd",
+        ),
+    )
 
 
 @pytest.fixture
@@ -212,4 +209,3 @@ def synthetic_fasm_lines_invalid_tile():
             comment=None,
         ),
     ]
-

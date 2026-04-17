@@ -8,10 +8,10 @@ from FABulous_bit_gen.bit_gen import genBitstream
 
 
 class TestFullBitstreamIntegration:
-    """Integration tests with real FASM and spec files."""
+    """Integration tests run against every test design."""
 
     def test_all_output_files_created(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """All 4 output files should be created."""
         spec_file = temp_output_dir / "spec.bin"
@@ -21,7 +21,7 @@ class TestFullBitstreamIntegration:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
         assert output_base.with_suffix(".bin").exists()
@@ -30,9 +30,9 @@ class TestFullBitstreamIntegration:
         assert output_base.with_suffix(".vhd").exists()
 
     def test_bitstream_output_matches_expected(
-        self, real_spec_dict, real_fasm_path, temp_output_dir, real_expected_bin
+        self, real_spec_dict, design, temp_output_dir
     ):
-        """Bitstream output should match expected file byte-for-byte."""
+        """Bitstream output should match reference file byte-for-byte."""
         spec_file = temp_output_dir / "spec.bin"
         output_base = temp_output_dir / "output"
 
@@ -40,20 +40,15 @@ class TestFullBitstreamIntegration:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        with output_base.with_suffix(".bin").open("rb") as f:
-            generated = f.read()
-        with real_expected_bin.open("rb") as f:
-            expected = f.read()
-
-        assert generated == expected
+        assert output_base.with_suffix(".bin").read_bytes() == design.reference.bin.read_bytes()
 
     def test_csv_output_matches_expected(
-        self, real_spec_dict, real_fasm_path, temp_output_dir, real_expected_csv
+        self, real_spec_dict, design, temp_output_dir
     ):
-        """CSV output should match expected file line-by-line."""
+        """CSV output should match reference file line-by-line."""
         spec_file = temp_output_dir / "spec.bin"
         output_base = temp_output_dir / "output"
 
@@ -61,21 +56,19 @@ class TestFullBitstreamIntegration:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        generated_lines = (
-            output_base.with_suffix(".csv").read_text().strip().split("\n")
-        )
-        expected_lines = real_expected_csv.read_text().strip().split("\n")
+        generated_lines = output_base.with_suffix(".csv").read_text().strip().split("\n")
+        expected_lines = design.reference.csv.read_text().strip().split("\n")
 
         for gen_line, exp_line in zip(generated_lines, expected_lines):
             assert gen_line.strip() == exp_line.strip()
 
     def test_verilog_output_matches_expected(
-        self, real_spec_dict, real_fasm_path, temp_output_dir, real_expected_vh
+        self, real_spec_dict, design, temp_output_dir
     ):
-        """Verilog output should match expected file line-by-line."""
+        """Verilog output should match reference file line-by-line."""
         spec_file = temp_output_dir / "spec.bin"
         output_base = temp_output_dir / "output"
 
@@ -83,19 +76,19 @@ class TestFullBitstreamIntegration:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
         generated_lines = output_base.with_suffix(".vh").read_text().strip().split("\n")
-        expected_lines = real_expected_vh.read_text().strip().split("\n")
+        expected_lines = design.reference.vh.read_text().strip().split("\n")
 
         for gen_line, exp_line in zip(generated_lines, expected_lines):
             assert gen_line.strip() == exp_line.strip()
 
     def test_vhdl_output_matches_expected(
-        self, real_spec_dict, real_fasm_path, temp_output_dir, real_expected_vhd
+        self, real_spec_dict, design, temp_output_dir
     ):
-        """VHDL output should match expected file line-by-line."""
+        """VHDL output should match reference file line-by-line."""
         spec_file = temp_output_dir / "spec.bin"
         output_base = temp_output_dir / "output"
 
@@ -103,13 +96,11 @@ class TestFullBitstreamIntegration:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        generated_lines = (
-            output_base.with_suffix(".vhd").read_text().strip().split("\n")
-        )
-        expected_lines = real_expected_vhd.read_text().strip().split("\n")
+        generated_lines = output_base.with_suffix(".vhd").read_text().strip().split("\n")
+        expected_lines = design.reference.vhd.read_text().strip().split("\n")
 
         for gen_line, exp_line in zip(generated_lines, expected_lines):
             assert gen_line.strip() == exp_line.strip()
@@ -158,14 +149,15 @@ class TestFullBitstreamIntegrationFaultCases:
         assert output_base.with_suffix(".bin").exists()
         assert output_base.with_suffix(".csv").exists()
 
-    def test_spec_file_not_found(self, real_fasm_path, temp_output_dir):
+    def test_spec_file_not_found(self, test_data_dir, temp_output_dir):
         """Missing spec file should raise FileNotFoundError."""
         spec_file = temp_output_dir / "nonexistent.bin"
+        fasm_file = test_data_dir / "sequential_16bit_en" / "top.fasm"
         output_base = temp_output_dir / "output"
 
         with pytest.raises(FileNotFoundError):
             genBitstream(
-                str(real_fasm_path),
+                str(fasm_file),
                 str(spec_file),
                 str(output_base.with_suffix(".bin")),
             )
@@ -209,7 +201,7 @@ class TestFullBitstreamIntegrationEdgeCases:
     """Edge case integration tests with real test data."""
 
     def test_output_file_overwrite(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """Existing output files should be overwritten."""
         spec_file = temp_output_dir / "spec.bin"
@@ -222,14 +214,13 @@ class TestFullBitstreamIntegrationEdgeCases:
         output_base.with_suffix(".csv").write_text("old content")
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        bin_content = output_base.with_suffix(".bin").read_bytes()
-        assert bin_content != b"old content"
+        assert output_base.with_suffix(".bin").read_bytes() != b"old content"
 
     def test_bitstream_output_size_reasonable(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """Bitstream output size should be reasonable (not empty, not huge)."""
         spec_file = temp_output_dir / "spec.bin"
@@ -239,7 +230,7 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
         bitstream_size = output_base.with_suffix(".bin").stat().st_size
@@ -247,7 +238,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         assert bitstream_size < 10_000_000
 
     def test_csv_output_has_correct_structure(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """CSV output should have correct structural elements."""
         spec_file = temp_output_dir / "spec.bin"
@@ -257,7 +248,7 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
         csv_content = output_base.with_suffix(".csv").read_text()
@@ -267,7 +258,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         assert ",0,32," in csv_content
 
     def test_vhdl_output_is_valid_package(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """VHDL output should be a valid package structure."""
         spec_file = temp_output_dir / "spec.bin"
@@ -277,7 +268,7 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
         vhd_content = output_base.with_suffix(".vhd").read_text()
@@ -287,7 +278,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         assert "end package emulate_bitstream" in vhd_content
 
     def test_verilog_output_has_valid_defines(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """Verilog output should have valid define statements."""
         spec_file = temp_output_dir / "spec.bin"
@@ -297,7 +288,7 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
         vh_content = output_base.with_suffix(".vh").read_text()
@@ -306,7 +297,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         assert "640'b" in vh_content
 
     def test_multiple_sequential_runs(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """Multiple runs should produce identical output."""
         spec_file = temp_output_dir / "spec.bin"
@@ -317,20 +308,18 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base1.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base1.with_suffix(".bin"))
         )
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base2.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base2.with_suffix(".bin"))
         )
 
-        bin1 = output_base1.with_suffix(".bin").read_bytes()
-        bin2 = output_base2.with_suffix(".bin").read_bytes()
-        assert bin1 == bin2
+        assert output_base1.with_suffix(".bin").read_bytes() == output_base2.with_suffix(".bin").read_bytes()
 
     def test_bitstream_header_magic_number(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
-        """Bitstream output should have correct magic number in header."""
+        """Bitstream output should start with the FABulous sync header."""
         spec_file = temp_output_dir / "spec.bin"
         output_base = temp_output_dir / "output"
 
@@ -338,17 +327,14 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        with output_base.with_suffix(".bin").open("rb") as f:
-            header = f.read(20)
-
-        # Magic number is 0xFAB0FAB1
+        header = output_base.with_suffix(".bin").read_bytes()[:20]
         assert header == bytes.fromhex("00AAFF01000000010000000000000000FAB0FAB1")
 
     def test_bitstream_has_desync_at_end(
-        self, real_spec_dict, real_fasm_path, temp_output_dir
+        self, real_spec_dict, design, temp_output_dir
     ):
         """Bitstream output should end with desync frame."""
         spec_file = temp_output_dir / "spec.bin"
@@ -358,10 +344,8 @@ class TestFullBitstreamIntegrationEdgeCases:
             pickle.dump(real_spec_dict, f)
 
         genBitstream(
-            str(real_fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
+            str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        with output_base.with_suffix(".bin").open("rb") as f:
-            content = f.read()
-
+        content = output_base.with_suffix(".bin").read_bytes()
         assert content.endswith(bytes.fromhex("00100000"))
