@@ -22,6 +22,7 @@ from FABulous_bit_gen.custom_exception import SpecMissMatch
 
 try:
     from fasm import (
+        FasmLine,
         fasm_tuple_to_string,
         parse_fasm_filename,
         parse_fasm_string,
@@ -83,20 +84,17 @@ def _parse_fasm_to_canon_list(fasm_file: str) -> list:
 
     Returns
     -------
-    list[FasmLine]
+    list
         Canonicalised list of FASM lines parsed from the file.
-
-    Raises
-    ------
-    FileNotFoundError
-        If ``fasm_file`` does not exist.
     """
     fasm_lines = parse_fasm_filename(fasm_file)
     canonical_str = fasm_tuple_to_string(fasm_lines, True)
     return list(parse_fasm_string(canonical_str))
 
 
-def _init_tile_bits(spec_dict: dict) -> tuple:
+def _init_tile_bits(
+    spec_dict: dict,
+) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
     """Initialise per-tile bit arrays to all zeros.
 
     Allocates two flat integer lists of length
@@ -130,10 +128,10 @@ def _init_tile_bits(spec_dict: dict) -> tuple:
 
 
 def _apply_fasm_features(
-    canon_list: list,
+    canon_list: list[FasmLine],
     spec_dict: dict,
-    tile_bits: dict,
-    tile_bits_no_mask: dict,
+    tile_bits: dict[str, list[int]],
+    tile_bits_no_mask: dict[str, list[int]],
 ) -> None:
     """Apply FASM feature lines to the tile bit arrays in place.
 
@@ -166,12 +164,6 @@ def _apply_fasm_features(
     SpecMissMatch
         If a feature's tile location is not present in ``TileMap``, or if
         the feature name is not found in ``TileSpecs`` for that tile.
-    IndexError
-        If a feature string contains fewer than three dot-separated parts
-        (i.e. does not follow the ``TileLoc.Part1.Part2`` convention).
-    KeyError
-        If a feature is present in ``TileSpecs`` for a tile but absent from
-        the corresponding ``TileSpecs_No_Mask`` entry.
     """
     # Track which bit indices have already been written for each tile so that
     # overwrites are detected regardless of the bit value (a feature can
@@ -233,7 +225,7 @@ def _apply_fasm_features(
             )
 
 
-def _compute_grid_size(tile_bits: dict) -> tuple:
+def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
     """Compute grid dimensions from tile coordinate keys.
 
     Scans all keys in ``tile_bits`` (expected to follow the ``XnYm`` naming
@@ -251,12 +243,6 @@ def _compute_grid_size(tile_bits: dict) -> tuple:
     -------
     tuple[int, int]
         ``(num_columns, num_rows)`` — the total width and height of the grid.
-
-    Raises
-    ------
-    AttributeError
-        If any tile key does not match the ``X<digits>Y<digits>`` pattern,
-        causing the regex match to return ``None``.
     """
     # Write output string and introduce mask
     coords_re = re.compile(r"X(\d*)Y(\d*)")
@@ -270,8 +256,10 @@ def _compute_grid_size(tile_bits: dict) -> tuple:
 
 
 def _build_hdl_strings(
-    tile_bits_no_mask: dict, spec_dict: dict, include_border_rows: bool = False
-) -> tuple:
+    tile_bits_no_mask: dict[str, list[int]],
+    spec_dict: dict,
+    include_border_rows: bool = False,
+) -> tuple[str, str]:
     """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings.
 
     Produces one `` `define`` macro per non-NULL tile for Verilog and one
@@ -332,12 +320,12 @@ def _build_hdl_strings(
 
 
 def _build_csv_and_frame_data(
-    tile_bits: dict,
+    tile_bits: dict[str, list[int]],
     spec_dict: dict,
     num_rows: int,
     num_columns: int,
     include_border_rows: bool = False,
-) -> tuple:
+) -> tuple[str, list[list[bytes]]]:
     """Build the CSV output string and the per-column frame byte arrays.
 
     Iterates over interior rows only (rows 1 through ``num_rows - 2``
@@ -419,7 +407,7 @@ def _build_csv_and_frame_data(
     return csv_str, bit_array
 
 
-def _build_binary_bitstream(bit_array: list, num_columns: int) -> bytes:
+def _build_binary_bitstream(bit_array: list[list[bytes]], num_columns: int) -> bytes:
     """Assemble the final binary bitstream from per-column frame data.
 
     Prepends the 20-byte FABulous sync header, then for every column and
@@ -489,15 +477,6 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         output files: ``<base>.csv``, ``<base>.vh``, ``<base>.vhd``, and
         ``<base>.bin`` (the binary bitstream).
 
-    Raises
-    ------
-    FileNotFoundError
-        If ``fasm_file`` or ``spec_file`` does not exist.
-    pickle.UnpicklingError
-        If ``spec_file`` cannot be deserialised as a valid pickle.
-    SpecMissMatch
-        If a FASM feature references a tile location or feature name not
-        present in the bitstream specification.
     """
     canon_list = _parse_fasm_to_canon_list(fasm_file)
 
