@@ -33,7 +33,7 @@ bit_gen -genBitstream input.fasm spec.pkl output.bin
 ### Python API
 
 ```python
-from FABulous_bit_gen import genBitstream
+from fabulous_bit_gen import genBitstream
 
 genBitstream("input.fasm", "spec.pkl", "output.bin")
 ```

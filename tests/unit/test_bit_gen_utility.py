@@ -2,7 +2,7 @@
 
 import pytest
 
-from FABulous_bit_gen.bit_gen import bitstring_to_bytes
+from fabulous_bit_gen.bit_gen import bitstring_to_bytes
 
 
 class TestBitstringToBytes:

@@ -4,7 +4,7 @@ import pickle
 
 import pytest
 
-from FABulous_bit_gen.bit_gen import genBitstream
+from fabulous_bit_gen.bit_gen import genBitstream
 
 
 class TestFullBitstreamIntegration:
@@ -197,7 +197,7 @@ class TestFullBitstreamIntegrationFaultCases:
         self, real_spec_dict, temp_output_dir
     ) -> None:
         """FASM with tile not in spec should raise SpecMissMatch."""
-        from FABulous_bit_gen.custom_exception import SpecMissMatch
+        from fabulous_bit_gen.custom_exception import SpecMissMatch
 
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "invalid_tile.fasm"

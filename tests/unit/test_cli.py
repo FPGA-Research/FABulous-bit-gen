@@ -2,7 +2,7 @@
 
 import pytest
 
-from FABulous_bit_gen.bit_gen import bit_gen
+from fabulous_bit_gen.bit_gen import bit_gen
 
 
 class TestBitGenCLI:
@@ -10,7 +10,7 @@ class TestBitGenCLI:
 
     def test_valid_genbitstream_calls_genbitstream(self, mocker) -> None:
         """Valid genBitstream subcommand should call genBitstream function."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         mocker.patch(
             "sys.argv",
             ["bit_gen", "genBitstream", "test.fasm", "spec.bin", "output.bin"],
@@ -104,7 +104,7 @@ class TestBitGenCLI:
 
     def test_no_subcommand_does_not_call_genbitstream(self, mocker) -> None:
         """No subcommand should print help without calling genBitstream."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         mocker.patch("sys.argv", ["bit_gen"])
 
         bit_gen()
@@ -170,7 +170,7 @@ class TestBitGenCLIEdgeCases:
 
     def test_arguments_with_special_characters(self, mocker) -> None:
         """Arguments with special characters should be preserved."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         mocker.patch(
             "sys.argv",
             [
@@ -190,7 +190,7 @@ class TestBitGenCLIEdgeCases:
 
     def test_arguments_with_dots_in_filename(self, mocker) -> None:
         """Arguments with multiple dots in filename should work."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         mocker.patch(
             "sys.argv",
             ["bit_gen", "genBitstream", "test.v1.fasm", "spec.v2.bin", "out.v3.bin"],
@@ -202,7 +202,7 @@ class TestBitGenCLIEdgeCases:
 
     def test_program_name_with_path(self, mocker) -> None:
         """Program name with path should not affect parsing."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         mocker.patch(
             "sys.argv",
             [
@@ -220,7 +220,7 @@ class TestBitGenCLIEdgeCases:
 
     def test_very_long_filename(self, mocker) -> None:
         """Very long filename should be accepted."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         long_name = "a" * 255 + ".fasm"
         mocker.patch(
             "sys.argv",
@@ -233,7 +233,7 @@ class TestBitGenCLIEdgeCases:
 
     def test_unicode_filename(self, mocker) -> None:
         """Unicode filename should be accepted."""
-        mock_gen = mocker.patch("FABulous_bit_gen.bit_gen.genBitstream")
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.genBitstream")
         mocker.patch(
             "sys.argv",
             ["bit_gen", "genBitstream", "test_αβγ.fasm", "spec.bin", "output.bin"],

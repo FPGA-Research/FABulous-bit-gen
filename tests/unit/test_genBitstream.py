@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from fasm import FasmLine, SetFasmFeature
 
-from FABulous_bit_gen.bit_gen import genBitstream
-from FABulous_bit_gen.custom_exception import SpecMissMatch
+from fabulous_bit_gen.bit_gen import genBitstream
+from fabulous_bit_gen.custom_exception import SpecMissMatch
 
 
 class TestGenBitstreamInitialization:
@@ -26,9 +26,9 @@ class TestGenBitstreamInitialization:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -46,9 +46,9 @@ class TestGenBitstreamInitialization:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -113,10 +113,10 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string",
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string",
             return_value="canonical_string",
         )
 
@@ -124,7 +124,7 @@ class TestGenBitstreamFasmProcessing:
             return fasm_lines
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string",
+            "fabulous_bit_gen.bit_gen.parse_fasm_string",
             side_effect=mock_parse_fasm_string,
         )
 
@@ -132,7 +132,7 @@ class TestGenBitstreamFasmProcessing:
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -169,20 +169,20 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -230,20 +230,20 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -290,20 +290,20 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -343,20 +343,20 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -394,20 +394,20 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -427,9 +427,9 @@ class TestGenBitstreamFasmProcessing:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -496,19 +496,19 @@ class TestGenBitstreamFasmProcessing:
             pickle.dump(spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=lambda f: f.feature,
         )
-        mock_logger = mocker.patch("FABulous_bit_gen.bit_gen.logger")
+        mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
         return mock_logger
@@ -758,20 +758,20 @@ class TestGenBitstreamErrorHandling:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -806,20 +806,20 @@ class TestGenBitstreamErrorHandling:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -854,20 +854,20 @@ class TestGenBitstreamErrorHandling:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -890,9 +890,9 @@ class TestGenBitstreamFaultCases:
 
         fasm_file.write_text("")
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(FileNotFoundError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -919,9 +919,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             f.write(b"corrupted pickle data")
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(pickle.UnpicklingError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -936,9 +936,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump({}, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -960,9 +960,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -984,9 +984,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -1008,9 +1008,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -1032,9 +1032,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -1057,9 +1057,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -1082,9 +1082,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -1115,20 +1115,20 @@ class TestGenBitstreamFaultCases:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -1152,9 +1152,9 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict_with_invalid, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(AttributeError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
@@ -1189,20 +1189,20 @@ class TestGenBitstreamEdgeCases:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -1238,20 +1238,20 @@ class TestGenBitstreamEdgeCases:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -1281,9 +1281,9 @@ class TestGenBitstreamEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1315,9 +1315,9 @@ class TestGenBitstreamEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         # This raises KeyError because the code reconstructs "X0Y1" from dimensions
         # but only "X01Y01" exists in the TileMap
@@ -1342,9 +1342,9 @@ class TestGenBitstreamEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1383,20 +1383,20 @@ class TestGenBitstreamEdgeCases:
             pickle.dump(spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -1438,20 +1438,20 @@ class TestGenBitstreamEdgeCases:
             pickle.dump(spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -1474,9 +1474,9 @@ class TestGenBitstreamEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(
             str(temp_output_dir / "test.fasm"), str(spec_file), str(output_file)
@@ -1497,9 +1497,9 @@ class TestGenBitstreamEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(temp_output_dir / "test.fasm"), str(spec_file), "output.bin")
 
@@ -1524,9 +1524,9 @@ class TestGenBitstreamNullTileHandling:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1548,9 +1548,9 @@ class TestGenBitstreamNullTileHandling:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1588,9 +1588,9 @@ class TestGenBitstreamFrameMap:
         with spec_file.open("wb") as f:
             pickle.dump(spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1609,9 +1609,9 @@ class TestGenBitstreamFrameMap:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1633,9 +1633,9 @@ class TestGenBitstreamCsvOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1656,9 +1656,9 @@ class TestGenBitstreamCsvOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1681,9 +1681,9 @@ class TestGenBitstreamCsvOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1706,9 +1706,9 @@ class TestGenBitstreamCsvOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1743,9 +1743,9 @@ class TestGenBitstreamVhdlOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1766,9 +1766,9 @@ class TestGenBitstreamVhdlOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1792,9 +1792,9 @@ class TestGenBitstreamVhdlOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1822,9 +1822,9 @@ class TestGenBitstreamVerilogOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1845,9 +1845,9 @@ class TestGenBitstreamVerilogOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1868,9 +1868,9 @@ class TestGenBitstreamVerilogOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1910,20 +1910,20 @@ class TestGenBitstreamNoneSetFeature:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -1950,15 +1950,15 @@ class TestGenBitstreamNoneSetFeature:
             pickle.dump(minimal_spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
-        mocker.patch("FABulous_bit_gen.bit_gen.set_feature_to_str")
+        mocker.patch("fabulous_bit_gen.bit_gen.set_feature_to_str")
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -1979,9 +1979,9 @@ class TestGenBitstreamCsvRowBoundaries:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2006,9 +2006,9 @@ class TestGenBitstreamCsvRowBoundaries:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2071,20 +2071,20 @@ class TestGenBitstreamSpecInconsistency:
             pickle.dump(spec_dict, f)
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
         )
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
         )
 
         def mock_set_feature_to_str(feature):
             return feature.feature
 
         mocker.patch(
-            "FABulous_bit_gen.bit_gen.set_feature_to_str",
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=mock_set_feature_to_str,
         )
 
@@ -2109,9 +2109,9 @@ class TestGenBitstreamBinaryOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2131,9 +2131,9 @@ class TestGenBitstreamBinaryOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2154,9 +2154,9 @@ class TestGenBitstreamBinaryOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2177,9 +2177,9 @@ class TestGenBitstreamBinaryOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2202,9 +2202,9 @@ class TestGenBitstreamBinaryOutput:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2233,9 +2233,9 @@ class TestGenBitstreamBitManipulation:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
@@ -2261,9 +2261,9 @@ class TestGenBitstreamBitManipulation:
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
 
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("FABulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("FABulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 

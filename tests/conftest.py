@@ -1,4 +1,4 @@
-"""Shared fixtures for FABulous_bit_gen tests."""
+"""Shared fixtures for fabulous_bit_gen tests."""
 
 import pickle
 from pathlib import Path

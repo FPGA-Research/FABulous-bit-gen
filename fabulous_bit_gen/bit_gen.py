@@ -18,7 +18,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from FABulous_bit_gen.custom_exception import SpecMissMatch
+from fabulous_bit_gen.custom_exception import SpecMissMatch
 
 try:
     from fasm import (
