@@ -476,7 +476,6 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         Base output path.  The extension is replaced to produce the four
         output files: ``<base>.csv``, ``<base>.vh``, ``<base>.vhd``, and
         ``<base>.bin`` (the binary bitstream).
-
     """
     canon_list = _parse_fasm_to_canon_list(fasm_file)
 

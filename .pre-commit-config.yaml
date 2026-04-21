@@ -1,4 +1,4 @@
-files: ^(FABulous_bit_gen|tests|docs)/
+files: ^(fabulous_bit_gen|tests|docs)/
 default_language_version:
   python: python3.12
 repos:
