@@ -7,7 +7,17 @@ from pathlib import Path
 import pytest
 from fasm import FasmLine, SetFasmFeature
 
-from fabulous_bit_gen.bit_gen import genBitstream
+from fabulous_bit_gen.bit_gen import (
+    COLUMN_INDEX_BITS,
+    DESYNC_BIT,
+    FRAME_SELECT_BITS,
+    MAX_FRAMES_PER_COL,
+    SYNC_HEADER_HEX,
+    BitstreamFormat,
+    _build_binary_bitstream,
+    _resolve_bitstream_format,
+    genBitstream,
+)
 from fabulous_bit_gen.custom_exception import SpecMissMatch
 
 
@@ -473,6 +483,13 @@ class TestGenBitstreamFasmProcessing:
 
         Returns mock_logger.
         """
+        spec_dict = {
+            "SYNC_HEADER_HEX": SYNC_HEADER_HEX,
+            "COLUMN_INDEX_BITS": COLUMN_INDEX_BITS,
+            "FRAME_SELECT_BITS": FRAME_SELECT_BITS,
+            "DESYNC_BIT": DESYNC_BIT,
+            **spec_dict,
+        }
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -944,7 +961,7 @@ class TestGenBitstreamFaultCases:
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_archspecs(self, temp_output_dir, mocker) -> None:
-        """Spec dict missing ArchSpecs should raise KeyError."""
+        """Spec dict missing ArchSpecs should use default fallback values."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -964,8 +981,8 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        assert output_file.exists()
 
     def test_spec_dict_missing_tilemap(self, temp_output_dir, mocker) -> None:
         """Spec dict missing TileMap should raise KeyError."""
@@ -1040,7 +1057,7 @@ class TestGenBitstreamFaultCases:
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_archspecs_missing_maxframespercol(self, temp_output_dir, mocker) -> None:
-        """ArchSpecs missing MaxFramesPerCol should raise KeyError."""
+        """ArchSpecs missing MaxFramesPerCol should use fallback value."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -1050,7 +1067,7 @@ class TestGenBitstreamFaultCases:
             "TileMap": {"X0Y1": "W_IO"},
             "TileSpecs": {"X0Y1": {}},
             "TileSpecs_No_Mask": {"X0Y1": {}},
-            "FrameMap": {},
+            "FrameMap": {"W_IO": {}},
         }
 
         fasm_file.write_text("")
@@ -1061,11 +1078,11 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        assert output_file.exists()
 
     def test_archspecs_missing_framebitsperrow(self, temp_output_dir, mocker) -> None:
-        """ArchSpecs missing FrameBitsPerRow should raise KeyError."""
+        """ArchSpecs missing FrameBitsPerRow should use fallback value."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -1075,7 +1092,7 @@ class TestGenBitstreamFaultCases:
             "TileMap": {"X0Y1": "W_IO"},
             "TileSpecs": {"X0Y1": {}},
             "TileSpecs_No_Mask": {"X0Y1": {}},
-            "FrameMap": {},
+            "FrameMap": {"W_IO": {}},
         }
 
         fasm_file.write_text("")
@@ -1086,8 +1103,21 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        assert output_file.exists()
+
+    def test_resolve_bitstream_format_warns_when_using_defaults(self, mocker) -> None:
+        """Missing format fields should emit fallback warnings during resolution."""
+        mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
+        resolved = _resolve_bitstream_format({"ArchSpecs": {}})
+
+        assert resolved.frame_bits_per_row == FRAME_SELECT_BITS
+        assert resolved.max_frames_per_col == MAX_FRAMES_PER_COL
+        assert resolved.sync_header_hex == SYNC_HEADER_HEX
+        assert resolved.column_index_bits == COLUMN_INDEX_BITS
+        assert resolved.frame_select_bits == FRAME_SELECT_BITS
+        assert resolved.desync_bit == DESYNC_BIT
+        assert mock_logger.warning.call_count == 6
 
     def test_feature_with_insufficient_parts(
         self, minimal_spec_dict, temp_output_dir, mocker
@@ -2214,6 +2244,87 @@ class TestGenBitstreamBinaryOutput:
         header_size = 20
         desync_size = 4
         assert len(content) >= header_size + desync_size
+
+    def test_bitstream_uses_spec_max_frames_per_col(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ) -> None:
+        """Binary size should follow ArchSpecs MaxFramesPerCol, not fixed 20."""
+        spec_dict = {
+            **minimal_spec_dict,
+            "ArchSpecs": {"MaxFramesPerCol": 3, "FrameBitsPerRow": 32},
+        }
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        with spec_file.open("wb") as f:
+            pickle.dump(spec_dict, f)
+
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        with output_file.open("rb") as f:
+            content = f.read()
+
+        # 20-byte header + (2 cols * 3 frames * (4-byte frame-select + 4-byte data))
+        # + 4-byte desync frame.
+        assert len(content) == 20 + (2 * 3 * (4 + 4)) + 4
+
+    def test_binary_builder_warns_on_frame_count_mismatch(self, mocker) -> None:
+        """Mismatch between spec frame count and bit_array emits warning."""
+        mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
+        bitstream = _build_binary_bitstream(
+            bit_array=[[b"\x00\x00\x00\x00"]],
+            num_columns=1,
+            bitstream_format=BitstreamFormat(
+                frame_bits_per_row=32,
+                max_frames_per_col=2,
+                sync_header_hex="00AAFF01000000010000000000000000FAB0FAB1",
+                column_index_bits=5,
+                frame_select_bits=32,
+                desync_bit=20,
+            ),
+        )
+
+        mock_logger.warning.assert_called_once()
+        warning_msg = mock_logger.warning.call_args[0][0]
+        assert "Column 0" in warning_msg
+        assert "ArchSpecs['MaxFramesPerCol'] is 2" in warning_msg
+        assert len(bitstream) == 20 + (1 * (4 + 4)) + 4
+
+    def test_bitstream_uses_spec_overrides_for_wire_constants(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ) -> None:
+        """Binary builder should use spec-provided wire format constants."""
+        spec_dict = {
+            **minimal_spec_dict,
+            "ArchSpecs": {"MaxFramesPerCol": 1, "FrameBitsPerRow": 16},
+            "SYNC_HEADER_HEX": "A1B2C3D4",
+            "COLUMN_INDEX_BITS": 4,
+            "FRAME_SELECT_BITS": 16,
+            "DESYNC_BIT": 7,
+        }
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        with spec_file.open("wb") as f:
+            pickle.dump(spec_dict, f)
+
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        with output_file.open("rb") as f:
+            content = f.read()
+
+        assert content.startswith(bytes.fromhex("A1B2C3D4"))
+        assert content.endswith((1 << 7).to_bytes(2, byteorder="big"))
 
 
 class TestGenBitstreamBitManipulation:
