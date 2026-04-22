@@ -68,13 +68,15 @@ class TestFullBitstreamIntegration:
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        generated_lines = (
-            output_base.with_suffix(".csv").read_text().strip().split("\n")
-        )
-        expected_lines = design.reference.csv.read_text().strip().split("\n")
+        generated_lines = [
+            l.strip()
+            for l in output_base.with_suffix(".csv").read_text().strip().split("\n")
+        ]
+        expected_lines = [
+            l.strip() for l in design.reference.csv.read_text().strip().split("\n")
+        ]
 
-        for gen_line, exp_line in zip(generated_lines, expected_lines, strict=False):
-            assert gen_line.strip() == exp_line.strip()
+        assert generated_lines == expected_lines
 
     def test_verilog_output_matches_expected(
         self, real_spec_dict, design, temp_output_dir
@@ -90,11 +92,15 @@ class TestFullBitstreamIntegration:
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        generated_lines = output_base.with_suffix(".vh").read_text().strip().split("\n")
-        expected_lines = design.reference.vh.read_text().strip().split("\n")
+        generated_lines = [
+            l.strip()
+            for l in output_base.with_suffix(".vh").read_text().strip().split("\n")
+        ]
+        expected_lines = [
+            l.strip() for l in design.reference.vh.read_text().strip().split("\n")
+        ]
 
-        for gen_line, exp_line in zip(generated_lines, expected_lines, strict=False):
-            assert gen_line.strip() == exp_line.strip()
+        assert generated_lines == expected_lines
 
     def test_vhdl_output_matches_expected(
         self, real_spec_dict, design, temp_output_dir
@@ -110,13 +116,15 @@ class TestFullBitstreamIntegration:
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
-        generated_lines = (
-            output_base.with_suffix(".vhd").read_text().strip().split("\n")
-        )
-        expected_lines = design.reference.vhd.read_text().strip().split("\n")
+        generated_lines = [
+            l.strip()
+            for l in output_base.with_suffix(".vhd").read_text().strip().split("\n")
+        ]
+        expected_lines = [
+            l.strip() for l in design.reference.vhd.read_text().strip().split("\n")
+        ]
 
-        for gen_line, exp_line in zip(generated_lines, expected_lines, strict=False):
-            assert gen_line.strip() == exp_line.strip()
+        assert generated_lines == expected_lines
 
 
 class TestFullBitstreamIntegrationFaultCases:
