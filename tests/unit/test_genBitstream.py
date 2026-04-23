@@ -1162,14 +1162,13 @@ class TestGenBitstreamFaultCases:
             side_effect=mock_set_feature_to_str,
         )
 
-        with pytest.raises(IndexError):
+        with pytest.raises(SpecMissMatch, match="fewer than 3 dot-separated parts"):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_tile_coord_invalid_format(
         self, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
-        """Tile coordinate that doesn't match X\\d*Y\\d* pattern causes
-        AttributeError."""
+        """Tile coordinate that doesn't match XnYm pattern raises ValueError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -1186,7 +1185,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValueError, match="XnYm format"):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
 
@@ -2054,11 +2053,11 @@ class TestGenBitstreamCsvRowBoundaries:
 class TestGenBitstreamSpecInconsistency:
     """Tests for TileSpecs / TileSpecs_No_Mask inconsistency."""
 
-    def test_feature_missing_from_tilespecs_no_mask_raises_keyerror(
+    def test_feature_missing_from_tilespecs_no_mask_raises_specmissmatch(
         self, temp_output_dir, mocker
     ) -> None:
         """Feature in TileSpecs but absent from TileSpecs_No_Mask should raise
-        KeyError."""
+        SpecMissMatch."""
         spec_dict = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
             "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
@@ -2118,7 +2117,7 @@ class TestGenBitstreamSpecInconsistency:
             side_effect=mock_set_feature_to_str,
         )
 
-        with pytest.raises(KeyError):
+        with pytest.raises(SpecMissMatch, match="TileSpecs_No_Mask"):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
 
@@ -2292,7 +2291,7 @@ class TestGenBitstreamBinaryOutput:
         mock_logger.warning.assert_called_once()
         warning_msg = mock_logger.warning.call_args[0][0]
         assert "Column 0" in warning_msg
-        assert "ArchSpecs['MaxFramesPerCol'] is 2" in warning_msg
+        assert "MaxFramesPerCol is 2" in warning_msg
         assert len(bitstream) == 20 + (1 * (4 + 4)) + 4
 
     def test_bitstream_uses_spec_overrides_for_wire_constants(

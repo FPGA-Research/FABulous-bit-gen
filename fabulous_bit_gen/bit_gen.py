@@ -48,6 +48,11 @@ SYNC_HEADER_HEX: str = "00AAFF01000000010000000000000000FAB0FAB1"
 DESYNC_BIT: int = 20
 """Default bit position of desync flag inside the frame-select word."""
 
+FRAME_BITS_PER_ROW: int = 32
+"""Default number of data bits per frame row."""
+
+_TILE_COORDS_RE = re.compile(r"X(\d+)Y(\d+)")
+
 
 @dataclass(frozen=True)
 class BitstreamFormat:
@@ -80,7 +85,7 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
         return default
 
     return BitstreamFormat(
-        frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_SELECT_BITS)),
+        frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_BITS_PER_ROW)),
         max_frames_per_col=int(pick("MaxFramesPerCol", MAX_FRAMES_PER_COL)),
         sync_header_hex=str(pick("SYNC_HEADER_HEX", SYNC_HEADER_HEX)),
         column_index_bits=int(pick("COLUMN_INDEX_BITS", COLUMN_INDEX_BITS)),
@@ -143,8 +148,7 @@ def _init_tile_bits(
     ----------
     spec_dict : dict
         Bitstream specification dictionary loaded from the pickle spec file.
-        Must contain ``ArchSpecs`` (with ``FrameBitsPerRow`` and
-        ``MaxFramesPerCol``) and ``TileMap``.
+        Must contain ``TileMap``.
 
     Returns
     -------
@@ -157,8 +161,6 @@ def _init_tile_bits(
         bitstream_format.max_frames_per_col * bitstream_format.frame_bits_per_row
     )
 
-    # Change this so it has the actual right dimensions, initialised as
-    # an empty bitstream
     tile_bits = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     tile_bits_no_mask = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     return tile_bits, tile_bits_no_mask
@@ -211,10 +213,15 @@ def _apply_fasm_features(
     for line in canon_list:
         if not line.set_feature:
             continue
-        if "CLK" in set_feature_to_str(line.set_feature):
+        feature_str = set_feature_to_str(line.set_feature)
+        if "CLK" in feature_str:
             continue
 
-        feature_parts = set_feature_to_str(line.set_feature).split(".")
+        feature_parts = feature_str.split(".")
+        if len(feature_parts) < 3:
+            raise SpecMissMatch(
+                f"Feature '{feature_str}' has fewer than 3 dot-separated parts"
+            )
         tile_loc = feature_parts[0]
         feature_name = ".".join((feature_parts[1], feature_parts[2]))
 
@@ -240,6 +247,11 @@ def _apply_fasm_features(
                         )
                     touched_bits[tile_loc].add(bit_idx)
                     tile_bits[tile_loc][bit_idx] = new_val
+                if feature_name not in spec_dict["TileSpecs_No_Mask"][tile_loc]:
+                    raise SpecMissMatch(
+                        f"Feature '{feature_name}' of tile '{tile_loc}' missing "
+                        "from TileSpecs_No_Mask"
+                    )
                 for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][
                     feature_name
                 ].items():
@@ -281,12 +293,12 @@ def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
     tuple[int, int]
         ``(num_columns, num_rows)`` — the total width and height of the grid.
     """
-    # Write output string and introduce mask
-    coords_re = re.compile(r"X(\d*)Y(\d*)")
     num_columns = 0
     num_rows = 0
     for tile_key in tile_bits:
-        coords_match = coords_re.match(tile_key)
+        coords_match = _TILE_COORDS_RE.match(tile_key)
+        if coords_match is None:
+            raise ValueError(f"Tile key '{tile_key}' does not match expected XnYm format")
         num_columns = max(int(coords_match.group(1)) + 1, num_columns)
         num_rows = max(int(coords_match.group(2)) + 1, num_rows)
     return num_columns, num_rows
@@ -478,7 +490,7 @@ def _build_binary_bitstream(
         if len(column_frames) != bitstream_format.max_frames_per_col:
             logger.warning(
                 f"Column {col} has {len(column_frames)} frames in bit_array, "
-                "but ArchSpecs['MaxFramesPerCol'] is "
+                f"but bitstream spec MaxFramesPerCol is "
                 f"{bitstream_format.max_frames_per_col}; "
                 "using frame count from bit_array."
             )
@@ -575,7 +587,7 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     with output_path.with_suffix(".vhd").open("w+") as f:
         f.write(vhdl_str)
     # Write out binary representation
-    with output_path.open("bw+") as f:
+    with output_path.open("wb") as f:
         f.write(bitstream_bytes)
 
 
