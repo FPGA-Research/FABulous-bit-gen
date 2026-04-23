@@ -85,7 +85,6 @@ DESYNC_BIT: int = 20
 """Default bit position of desync flag inside the frame-select word."""
 
 
-
 @dataclass(frozen=True)
 class BitstreamFormat:
     """Typed bitstream wire-format settings resolved from spec/defaults."""
@@ -198,6 +197,9 @@ def _init_tile_bits(
     spec_dict : dict
         Bitstream specification dictionary loaded from the pickle spec file.
         Must contain ``TileMap``.
+    bitstream_format : BitstreamFormat
+        Resolved wire-format settings supplying ``MaxFramesPerCol`` and
+        ``FrameBitsPerRow`` for the allocation size.
 
     Returns
     -------
@@ -341,12 +343,17 @@ def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
     -------
     tuple[int, int]
         ``(num_columns, num_rows)`` — the total width and height of the grid.
+
+    Raises
+    ------
+    ValueError
+        If any tile key does not match the ``XnYm`` coordinate format.
     """
+    coords_re = re.compile(r"X(\d+)Y(\d+)")
     num_columns = 0
     num_rows = 0
-    tile_cord_re = re.compile(r"X(\d+)Y(\d+)")
     for tile_key in tile_bits:
-        coords_match = tile_cord_re.match(tile_key)
+        coords_match = coords_re.match(tile_key)
         if coords_match is None:
             raise ValueError(f"Tile key '{tile_key}' does not match XnYm format")
         num_columns = max(int(coords_match.group(1)) + 1, num_columns)
@@ -373,9 +380,11 @@ def _build_hdl_strings(
         Unmasked per-tile bit arrays (as produced by ``_apply_fasm_features``
         into the ``tile_bits_no_mask`` structure).
     spec_dict : dict
-        Bitstream specification dictionary.  Must contain ``ArchSpecs``
-        (``FrameBitsPerRow``, ``MaxFramesPerCol``), ``TileMap``, and
+        Bitstream specification dictionary.  Must contain ``TileMap`` and
         ``FrameMap``.
+    bitstream_format : BitstreamFormat
+        Resolved wire-format settings supplying frame dimensions and the
+        ``include_border_rows`` flag.
 
     Returns
     -------
@@ -444,6 +453,9 @@ def _build_csv_and_frame_data(
         Total number of rows in the grid (from ``_compute_grid_size``).
     num_columns : int
         Total number of columns in the grid (from ``_compute_grid_size``).
+    bitstream_format : BitstreamFormat
+        Resolved wire-format settings supplying frame dimensions and the
+        ``include_border_rows`` flag.
 
     Returns
     -------
@@ -544,7 +556,11 @@ def _build_binary_bitstream(
             # Frame-select word: column in top bits (address),
             # frame as one-hot bit (select).
             frame_select_word = (
-                col << (bitstream_format.frame_select_bits - bitstream_format.column_index_bits)
+                col
+                << (
+                    bitstream_format.frame_select_bits
+                    - bitstream_format.column_index_bits
+                )
             ) | (1 << frame_idx)
             bitstream += frame_select_word.to_bytes(
                 math.ceil(bitstream_format.frame_select_bits / 8), byteorder="big"
@@ -585,6 +601,13 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         Base output path.  The extension is replaced to produce the four
         output files: ``<base>.csv``, ``<base>.vh``, ``<base>.vhd``, and
         ``<base>.bin`` (the binary bitstream).
+
+    Raises
+    ------
+    ValueError
+        If the resolved bitstream format is invalid (e.g. ``MaxFramesPerCol``
+        exceeds ``FRAME_SELECT_BITS``, or the grid is wider than
+        ``COLUMN_INDEX_BITS`` can address).
     """
     canon_list = _parse_fasm_to_canon_list(fasm_file)
 
@@ -596,7 +619,7 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
-    max_addressable_columns = 2 ** bitstream_format.column_index_bits
+    max_addressable_columns = 2**bitstream_format.column_index_bits
     if num_columns > max_addressable_columns:
         raise ValueError(
             f"Grid has {num_columns} columns but COLUMN_INDEX_BITS "
@@ -622,9 +645,6 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         bitstream_format,
     )
 
-    # Note - format in output file is line by line:
-    # Tile Loc, Tile Type, X, Y, bits...... \n
-    # Each line is one tile
     output_path = Path(bitstream_file)
     # Write out bitstream CSV representation
     with output_path.with_suffix(".csv").open("w+") as f:

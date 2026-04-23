@@ -69,11 +69,12 @@ class TestFullBitstreamIntegration:
         )
 
         generated_lines = [
-            l.strip()
-            for l in output_base.with_suffix(".csv").read_text().strip().split("\n")
+            line.strip()
+            for line in output_base.with_suffix(".csv").read_text().strip().split("\n")
         ]
         expected_lines = [
-            l.strip() for l in design.reference.csv.read_text().strip().split("\n")
+            line.strip()
+            for line in design.reference.csv.read_text().strip().split("\n")
         ]
 
         assert generated_lines == expected_lines
@@ -93,11 +94,11 @@ class TestFullBitstreamIntegration:
         )
 
         generated_lines = [
-            l.strip()
-            for l in output_base.with_suffix(".vh").read_text().strip().split("\n")
+            line.strip()
+            for line in output_base.with_suffix(".vh").read_text().strip().split("\n")
         ]
         expected_lines = [
-            l.strip() for l in design.reference.vh.read_text().strip().split("\n")
+            line.strip() for line in design.reference.vh.read_text().strip().split("\n")
         ]
 
         assert generated_lines == expected_lines
@@ -117,11 +118,12 @@ class TestFullBitstreamIntegration:
         )
 
         generated_lines = [
-            l.strip()
-            for l in output_base.with_suffix(".vhd").read_text().strip().split("\n")
+            line.strip()
+            for line in output_base.with_suffix(".vhd").read_text().strip().split("\n")
         ]
         expected_lines = [
-            l.strip() for l in design.reference.vhd.read_text().strip().split("\n")
+            line.strip()
+            for line in design.reference.vhd.read_text().strip().split("\n")
         ]
 
         assert generated_lines == expected_lines

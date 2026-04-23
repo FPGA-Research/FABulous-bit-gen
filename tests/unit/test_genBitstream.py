@@ -1119,27 +1119,35 @@ class TestGenBitstreamFaultCases:
 
     def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
         """MaxFramesPerCol > FRAME_SELECT_BITS should raise ValueError."""
-        with pytest.raises(ValueError, match="MaxFramesPerCol.*exceeds.*FRAME_SELECT_BITS"):
-            _resolve_bitstream_format({
-                "MaxFramesPerCol": 33,
-                "FRAME_SELECT_BITS": 32,
-            })
+        with pytest.raises(
+            ValueError, match="MaxFramesPerCol.*exceeds.*FRAME_SELECT_BITS"
+        ):
+            _resolve_bitstream_format(
+                {
+                    "MaxFramesPerCol": 33,
+                    "FRAME_SELECT_BITS": 32,
+                }
+            )
 
     def test_resolve_format_raises_when_column_index_bits_too_large(self) -> None:
         """COLUMN_INDEX_BITS >= FRAME_SELECT_BITS should raise ValueError."""
         with pytest.raises(ValueError, match="COLUMN_INDEX_BITS.*must be less than"):
-            _resolve_bitstream_format({
-                "COLUMN_INDEX_BITS": 32,
-                "FRAME_SELECT_BITS": 32,
-            })
+            _resolve_bitstream_format(
+                {
+                    "COLUMN_INDEX_BITS": 32,
+                    "FRAME_SELECT_BITS": 32,
+                }
+            )
 
     def test_resolve_format_raises_when_desync_bit_too_large(self) -> None:
         """DESYNC_BIT >= FRAME_SELECT_BITS should raise ValueError."""
         with pytest.raises(ValueError, match="DESYNC_BIT.*must be less than"):
-            _resolve_bitstream_format({
-                "DESYNC_BIT": 32,
-                "FRAME_SELECT_BITS": 32,
-            })
+            _resolve_bitstream_format(
+                {
+                    "DESYNC_BIT": 32,
+                    "FRAME_SELECT_BITS": 32,
+                }
+            )
 
     def test_genbitstream_raises_when_grid_wider_than_column_index_bits(
         self, temp_output_dir, mocker
