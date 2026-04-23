@@ -8,6 +8,27 @@ into configuration bitstreams that can be loaded onto the FPGA fabric.
 
 The module includes functions for parsing FASM files, processing configuration bits, and
 generating the final bitstream output in various formats.
+
+Bitstream format
+----------------
+The binary bitstream has the following structure::
+
+    [ 20-byte sync header           ]
+    for each column (x = 0 … num_columns-1):
+      for each frame (f = 0 … MaxFramesPerCol-1):
+        [ 4-byte frame-select word  ]  — addresses column + frame
+        [ frame data bytes          ]  — ceil(FrameBitsPerRow/8) bytes of config bits
+    [ 4-byte desync frame           ]  — bit DESYNC_BIT set
+
+Frame-select word (32-bit big-endian):
+  - Bits [31:27] (top 5): column index in normal binary order.
+  - Bit f (counting from LSB): set to 1 to select frame index f.
+  - All other bits: 0.
+
+Frame data bytes:
+  Concatenation of FrameBitsPerRow configuration bits from every interior row
+  of that column (Y descending, border rows skipped), bit-reversed per row,
+  packed into bytes.
 """
 
 import argparse
@@ -37,7 +58,22 @@ COLUMN_INDEX_BITS: int = 5
 """Default bits used to encode column index inside the frame-select word."""
 
 FRAME_SELECT_BITS: int = 32
-"""Default width in bits of the frame-select word prepended to each frame."""
+"""Default width of the frame-select *addressing* word (bits) prepended to each frame.
+
+This word encodes which column and which frame index is active. Its width caps
+the maximum number of frames per column: frame index ``f`` sets bit ``f``, so
+``FRAME_SELECT_BITS`` must be >= ``MAX_FRAMES_PER_COL``. Not related to the
+width of the configuration data payload (see ``FRAME_BITS_PER_ROW``).
+"""
+
+FRAME_BITS_PER_ROW: int = 32
+"""Default width of the configuration *data* payload (bits) per frame row.
+
+This is the number of configuration bits carried in each frame's data section,
+independent of the frame-select addressing word width (``FRAME_SELECT_BITS``).
+Both default to 32 in FABulous but serve different roles: ``FRAME_SELECT_BITS``
+controls addressing; ``FRAME_BITS_PER_ROW`` controls data payload size.
+"""
 
 MAX_FRAMES_PER_COL: int = 20
 """Default maximum number of frames per column."""
@@ -48,10 +84,6 @@ SYNC_HEADER_HEX: str = "00AAFF01000000010000000000000000FAB0FAB1"
 DESYNC_BIT: int = 20
 """Default bit position of desync flag inside the frame-select word."""
 
-FRAME_BITS_PER_ROW: int = 32
-"""Default number of data bits per frame row."""
-
-_TILE_COORDS_RE = re.compile(r"X(\d+)Y(\d+)")
 
 
 @dataclass(frozen=True)
@@ -84,7 +116,7 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
         logger.warning(f"{key} missing in bitstream spec; using default {default!r}.")
         return default
 
-    return BitstreamFormat(
+    fmt = BitstreamFormat(
         frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_BITS_PER_ROW)),
         max_frames_per_col=int(pick("MaxFramesPerCol", MAX_FRAMES_PER_COL)),
         sync_header_hex=str(pick("SYNC_HEADER_HEX", SYNC_HEADER_HEX)),
@@ -93,6 +125,23 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
         desync_bit=int(pick("DESYNC_BIT", DESYNC_BIT)),
         include_border_rows=bool(spec_dict.get("include_border_rows", False)),
     )
+    if fmt.max_frames_per_col > fmt.frame_select_bits:
+        raise ValueError(
+            f"MaxFramesPerCol ({fmt.max_frames_per_col}) exceeds "
+            f"FRAME_SELECT_BITS ({fmt.frame_select_bits}): frame index would "
+            "overflow the frame-select word"
+        )
+    if fmt.column_index_bits >= fmt.frame_select_bits:
+        raise ValueError(
+            f"COLUMN_INDEX_BITS ({fmt.column_index_bits}) must be less than "
+            f"FRAME_SELECT_BITS ({fmt.frame_select_bits})"
+        )
+    if fmt.desync_bit >= fmt.frame_select_bits:
+        raise ValueError(
+            f"DESYNC_BIT ({fmt.desync_bit}) must be less than "
+            f"FRAME_SELECT_BITS ({fmt.frame_select_bits})"
+        )
+    return fmt
 
 
 def bitstring_to_bytes(s: str) -> bytes:
@@ -295,10 +344,11 @@ def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
     """
     num_columns = 0
     num_rows = 0
+    tile_cord_re = re.compile(r"X(\d+)Y(\d+)")
     for tile_key in tile_bits:
-        coords_match = _TILE_COORDS_RE.match(tile_key)
+        coords_match = tile_cord_re.match(tile_key)
         if coords_match is None:
-            raise ValueError(f"Tile key '{tile_key}' does not match expected XnYm format")
+            raise ValueError(f"Tile key '{tile_key}' does not match XnYm format")
         num_columns = max(int(coords_match.group(1)) + 1, num_columns)
         num_rows = max(int(coords_match.group(2)) + 1, num_rows)
     return num_columns, num_rows
@@ -326,6 +376,7 @@ def _build_hdl_strings(
         Bitstream specification dictionary.  Must contain ``ArchSpecs``
         (``FrameBitsPerRow``, ``MaxFramesPerCol``), ``TileMap``, and
         ``FrameMap``.
+
     Returns
     -------
     tuple[str, str]
@@ -393,6 +444,7 @@ def _build_csv_and_frame_data(
         Total number of rows in the grid (from ``_compute_grid_size``).
     num_columns : int
         Total number of columns in the grid (from ``_compute_grid_size``).
+
     Returns
     -------
     tuple[str, list[list[bytes]]]
@@ -401,52 +453,51 @@ def _build_csv_and_frame_data(
         column/frame combination, ready for binary assembly.
     """
     csv_str = ""
+    # bit_array[col][frame] accumulates packed bytes from every row in that column.
     bit_array = [
         [b"" for _ in range(bitstream_format.max_frames_per_col)]
         for _ in range(num_columns)
     ]
 
     if bitstream_format.include_border_rows:
+        logger.info("Border rows included in bitstream.")
         start_row = num_rows - 1
         stop_row = -1
     else:
-        logger.info("Legacy FABulous 1.0 bitstream generation enabled.")
+        logger.info("Border rows excluded from bitstream (default).")
         start_row = num_rows - 2
         stop_row = 0
 
+    # Rows are written top-to-bottom in the CSV
     for y in range(start_row, stop_row, -1):
         for x in range(num_columns):
             tile_key = f"X{x}Y{y}"
-            tile_csv = ",".join(
-                (tile_key, spec_dict["TileMap"][tile_key], str(x), str(y))
-            )
-            tile_csv += "\n"
+            tile_type = spec_dict["TileMap"][tile_key]
+
+            tile_csv = f"{tile_key},{tile_type},{x},{y}\n"
 
             for frame_idx in range(bitstream_format.max_frames_per_col):
-                if spec_dict["TileMap"][tile_key] == "NULL":
-                    frame_bit_row = "0" * bitstream_format.frame_bits_per_row
+                if tile_type == "NULL":
+                    # NULL get an all-zero row
+                    frame_bits = "0" * bitstream_format.frame_bits_per_row
                 else:
-                    start = bitstream_format.frame_bits_per_row * frame_idx
-                    frame_bit_row = "".join(
-                        map(
-                            str,
-                            tile_bits[tile_key][
-                                start : start + bitstream_format.frame_bits_per_row
-                            ],
-                        )
-                    )[::-1]
+                    # Slice this frame's bits from the flat per-tile array and
+                    # bit-reverse: the spec stores bits in frame-ascending order
+                    # but we need them reversed within each row.
+                    offset = bitstream_format.frame_bits_per_row * frame_idx
+                    raw = tile_bits[tile_key][
+                        offset : offset + bitstream_format.frame_bits_per_row
+                    ]
+                    frame_bits = "".join(map(str, raw))[::-1]
 
-                tile_csv += ",".join(
-                    (
-                        f"frame{frame_idx}",
-                        str(frame_idx),
-                        str(bitstream_format.frame_bits_per_row),
-                        frame_bit_row,
-                    )
+                tile_csv += (
+                    f"frame{frame_idx},{frame_idx},"
+                    f"{bitstream_format.frame_bits_per_row},{frame_bits}\n"
                 )
-                tile_csv += "\n"
 
-                bit_array[x][frame_idx] += bitstring_to_bytes(frame_bit_row)
+                # Append this row's contribution; the full column/frame payload
+                # is the concatenation of all rows processed in this loop.
+                bit_array[x][frame_idx] += bitstring_to_bytes(frame_bits)
 
             csv_str += tile_csv + "\n"
 
@@ -462,10 +513,10 @@ def _build_binary_bitstream(
 
     Prepends the 20-byte FABulous sync header, then for every column and
     each frame present in ``bit_array[col]`` emits a 32-bit frame-select
-    word followed by the frame's data bytes. The frame-select word encodes
-    the column index in the five least-significant bits (in reversed bit
-    order) and sets the bit corresponding to the active frame index.
-    Finally appends the 4-byte desync frame (bit 20 is the desync flag).
+    word followed by the frame's data bytes. The frame-select word places
+    the column index in the top ``COLUMN_INDEX_BITS`` bits and sets bit
+    ``frame_idx`` (one-hot) to identify the active frame.
+    Finally appends the desync frame with bit ``DESYNC_BIT`` set.
 
     Parameters
     ----------
@@ -483,36 +534,25 @@ def _build_binary_bitstream(
         Complete binary bitstream including the sync header, all frame-select
         words and frame data, and the trailing desync frame.
     """
+    # Add sync header at the start of the bitstream
     bitstream = bytes.fromhex(bitstream_format.sync_header_hex)
 
+    # Emit one (frame-select word + frame data) pair per frame per column.
+    # Columns are written left-to-right; frames top-to-bottom within each column.
     for col in range(num_columns):
-        column_frames = bit_array[col]
-        if len(column_frames) != bitstream_format.max_frames_per_col:
-            logger.warning(
-                f"Column {col} has {len(column_frames)} frames in bit_array, "
-                f"but bitstream spec MaxFramesPerCol is "
-                f"{bitstream_format.max_frames_per_col}; "
-                "using frame count from bit_array."
+        for frame_idx, frame_data in enumerate(bit_array[col]):
+            # Frame-select word: column in top bits (address),
+            # frame as one-hot bit (select).
+            frame_select_word = (
+                col << (bitstream_format.frame_select_bits - bitstream_format.column_index_bits)
+            ) | (1 << frame_idx)
+            bitstream += frame_select_word.to_bytes(
+                math.ceil(bitstream_format.frame_select_bits / 8), byteorder="big"
             )
-        for frame_idx, frame_data in enumerate(column_frames):
-            if frame_idx >= bitstream_format.frame_select_bits:
-                raise ValueError(
-                    f"Frame index {frame_idx} exceeds frame-select width "
-                    f"{bitstream_format.frame_select_bits}"
-                )
-
-            col_idx_reversed = f"{col:0{bitstream_format.column_index_bits}b}"[::-1]
-            frame_select = ["0"] * bitstream_format.frame_select_bits
-
-            for k in range(-bitstream_format.column_index_bits, 0, 1):
-                frame_select[k] = col_idx_reversed[k]
-            frame_select[frame_idx] = "1"
-            frame_select_str = ("".join(frame_select))[::-1]
-
-            bitstream += bitstring_to_bytes(frame_select_str)
+            # Frame data: packed config bits for this column/frame across all rows
             bitstream += frame_data
 
-    # Add desync frame (bit desync_bit is the desync flag)
+    # Desync frame signals end-of-bitstream to the configuration engine.
     desync_frame = (1 << bitstream_format.desync_bit).to_bytes(
         math.ceil(bitstream_format.frame_select_bits / 8), byteorder="big"
     )
@@ -556,6 +596,14 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
+    max_addressable_columns = 2 ** bitstream_format.column_index_bits
+    if num_columns > max_addressable_columns:
+        raise ValueError(
+            f"Grid has {num_columns} columns but COLUMN_INDEX_BITS "
+            f"({bitstream_format.column_index_bits}) can only address "
+            f"{max_addressable_columns}: column index would overflow "
+            "the frame-select word"
+        )
     verilog_str, vhdl_str = _build_hdl_strings(
         tile_bits_no_mask,
         spec_dict,

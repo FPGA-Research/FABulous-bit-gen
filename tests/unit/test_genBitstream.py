@@ -13,8 +13,6 @@ from fabulous_bit_gen.bit_gen import (
     FRAME_SELECT_BITS,
     MAX_FRAMES_PER_COL,
     SYNC_HEADER_HEX,
-    BitstreamFormat,
-    _build_binary_bitstream,
     _resolve_bitstream_format,
     genBitstream,
 )
@@ -1118,6 +1116,59 @@ class TestGenBitstreamFaultCases:
         assert resolved.frame_select_bits == FRAME_SELECT_BITS
         assert resolved.desync_bit == DESYNC_BIT
         assert mock_logger.warning.call_count == 6
+
+    def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
+        """MaxFramesPerCol > FRAME_SELECT_BITS should raise ValueError."""
+        with pytest.raises(ValueError, match="MaxFramesPerCol.*exceeds.*FRAME_SELECT_BITS"):
+            _resolve_bitstream_format({
+                "MaxFramesPerCol": 33,
+                "FRAME_SELECT_BITS": 32,
+            })
+
+    def test_resolve_format_raises_when_column_index_bits_too_large(self) -> None:
+        """COLUMN_INDEX_BITS >= FRAME_SELECT_BITS should raise ValueError."""
+        with pytest.raises(ValueError, match="COLUMN_INDEX_BITS.*must be less than"):
+            _resolve_bitstream_format({
+                "COLUMN_INDEX_BITS": 32,
+                "FRAME_SELECT_BITS": 32,
+            })
+
+    def test_resolve_format_raises_when_desync_bit_too_large(self) -> None:
+        """DESYNC_BIT >= FRAME_SELECT_BITS should raise ValueError."""
+        with pytest.raises(ValueError, match="DESYNC_BIT.*must be less than"):
+            _resolve_bitstream_format({
+                "DESYNC_BIT": 32,
+                "FRAME_SELECT_BITS": 32,
+            })
+
+    def test_genbitstream_raises_when_grid_wider_than_column_index_bits(
+        self, temp_output_dir, mocker
+    ) -> None:
+        """Grid with more columns than COLUMN_INDEX_BITS can address should raise."""
+        # COLUMN_INDEX_BITS=2 → max 4 columns; grid has 5 (X0-X4)
+        spec_dict = {
+            "COLUMN_INDEX_BITS": 2,
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {f"X{x}Y{y}": "NULL" for x in range(5) for y in range(3)},
+            "TileSpecs": {f"X{x}Y{y}": {} for x in range(5) for y in range(3)},
+            "TileSpecs_No_Mask": {f"X{x}Y{y}": {} for x in range(5) for y in range(3)},
+            "FrameMap": {"NULL": {}},
+            "FrameMapEncode": {},
+        }
+        spec_file = temp_output_dir / "spec.bin"
+        with spec_file.open("wb") as f:
+            pickle.dump(spec_dict, f)
+
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
+        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+
+        with pytest.raises(ValueError, match="columns.*COLUMN_INDEX_BITS"):
+            genBitstream(
+                str(temp_output_dir / "test.fasm"),
+                str(spec_file),
+                str(temp_output_dir / "output.bin"),
+            )
 
     def test_feature_with_insufficient_parts(
         self, minimal_spec_dict, temp_output_dir, mocker
@@ -2271,28 +2322,6 @@ class TestGenBitstreamBinaryOutput:
         # 20-byte header + (2 cols * 3 frames * (4-byte frame-select + 4-byte data))
         # + 4-byte desync frame.
         assert len(content) == 20 + (2 * 3 * (4 + 4)) + 4
-
-    def test_binary_builder_warns_on_frame_count_mismatch(self, mocker) -> None:
-        """Mismatch between spec frame count and bit_array emits warning."""
-        mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
-        bitstream = _build_binary_bitstream(
-            bit_array=[[b"\x00\x00\x00\x00"]],
-            num_columns=1,
-            bitstream_format=BitstreamFormat(
-                frame_bits_per_row=32,
-                max_frames_per_col=2,
-                sync_header_hex="00AAFF01000000010000000000000000FAB0FAB1",
-                column_index_bits=5,
-                frame_select_bits=32,
-                desync_bit=20,
-            ),
-        )
-
-        mock_logger.warning.assert_called_once()
-        warning_msg = mock_logger.warning.call_args[0][0]
-        assert "Column 0" in warning_msg
-        assert "MaxFramesPerCol is 2" in warning_msg
-        assert len(bitstream) == 20 + (1 * (4 + 4)) + 4
 
     def test_bitstream_uses_spec_overrides_for_wire_constants(
         self, minimal_spec_dict, temp_output_dir, mocker
