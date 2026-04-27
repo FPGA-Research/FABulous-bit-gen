@@ -427,7 +427,7 @@ class TestGenBitstreamFasmProcessing:
     def test_empty_fasm_produces_zero_bitstream(
         self, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
-        """Empty FASM should produce bitstream with all zeros."""
+        """Empty FASM should produce an all-zero bitstream and log a warning."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -438,12 +438,15 @@ class TestGenBitstreamFasmProcessing:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
 
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
         assert "frame0" in csv_content
+        warning_messages = [call[0][0] for call in mock_logger.warning.call_args_list]
+        assert any("no features" in msg for msg in warning_messages)
 
     def _overlapping_spec(self):
         """Shared spec for overwrite-warning tests.
@@ -1007,7 +1010,7 @@ class TestGenBitstreamFaultCases:
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_tilespecs(self, temp_output_dir, mocker) -> None:
-        """Spec dict missing TileSpecs should raise KeyError."""
+        """Spec dict missing TileSpecs should raise SpecMissMatch."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -1027,7 +1030,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(KeyError):
+        with pytest.raises(SpecMissMatch):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_framemap(self, temp_output_dir, mocker) -> None:
