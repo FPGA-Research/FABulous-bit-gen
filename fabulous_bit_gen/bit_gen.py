@@ -630,9 +630,6 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     with Path(spec_file).open("rb") as f:
         spec_dict = pickle.load(f)
 
-    if "TileMap" in spec_dict and "TileSpecs" not in spec_dict:
-        raise SpecMissMatch("Bitstream spec is missing required key 'TileSpecs'")
-
     bitstream_format = _resolve_bitstream_format(spec_dict)
     tile_bits, tile_bits_no_mask = _init_tile_bits(spec_dict, bitstream_format)
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)

@@ -1010,10 +1010,23 @@ class TestGenBitstreamFaultCases:
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_tilespecs(self, temp_output_dir, mocker) -> None:
-        """Spec dict missing TileSpecs should raise SpecMissMatch."""
+        """Spec dict missing TileSpecs should raise KeyError."""
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
+        fasm_lines = [
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.W2MID7.A_I",
+                    start=None,
+                    end=None,
+                    value=1,
+                    value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            )
+        ]
 
         incomplete_spec = {
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
@@ -1026,11 +1039,18 @@ class TestGenBitstreamFaultCases:
         with spec_file.open("wb") as f:
             pickle.dump(incomplete_spec, f)
 
-        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=[])
-        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
-        mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string",
+            return_value="canonical_string",
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
 
-        with pytest.raises(SpecMissMatch):
+        with pytest.raises(KeyError):
             genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_framemap(self, temp_output_dir, mocker) -> None:
