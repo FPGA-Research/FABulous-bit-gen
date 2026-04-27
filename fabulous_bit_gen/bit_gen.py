@@ -273,6 +273,11 @@ def _apply_fasm_features(
             raise SpecMissMatch(
                 f"Feature '{feature_str}' has fewer than 3 dot-separated parts"
             )
+        if len(feature_parts) > 3:
+            logger.warning(
+                f"Feature '{feature_str}' has {len(feature_parts)} dot-separated "
+                "parts; only the first three are used — trailing parts are ignored."
+            )
         tile_loc = feature_parts[0]
         feature_name = ".".join((feature_parts[1], feature_parts[2]))
 
@@ -283,6 +288,8 @@ def _apply_fasm_features(
 
         # Set the necessary bits high
         tile_type = spec_dict["TileMap"][tile_loc]
+        if tile_loc not in spec_dict["TileSpecs"]:
+            raise SpecMissMatch(f"Tile location '{tile_loc}' not found in TileSpecs")
         if feature_name in spec_dict["TileSpecs"][tile_loc]:
             if spec_dict["TileSpecs"][tile_loc][feature_name]:
                 for bit_idx, bit_val in spec_dict["TileSpecs"][tile_loc][
@@ -298,6 +305,10 @@ def _apply_fasm_features(
                         )
                     touched_bits[tile_loc].add(bit_idx)
                     tile_bits[tile_loc][bit_idx] = new_val
+                if tile_loc not in spec_dict["TileSpecs_No_Mask"]:
+                    raise SpecMissMatch(
+                        f"Tile location '{tile_loc}' not found in TileSpecs_No_Mask"
+                    )
                 if feature_name not in spec_dict["TileSpecs_No_Mask"][tile_loc]:
                     raise SpecMissMatch(
                         f"Feature '{feature_name}' of tile '{tile_loc}' missing "
@@ -349,11 +360,12 @@ def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
     ValueError
         If any tile key does not match the ``XnYm`` coordinate format.
     """
-    coords_re = re.compile(r"X(\d+)Y(\d+)")
     num_columns = 0
     num_rows = 0
+    tile_coord_re: re.Pattern = re.compile(r"X(\d+)Y(\d+)")
+
     for tile_key in tile_bits:
-        coords_match = coords_re.match(tile_key)
+        coords_match = tile_coord_re.match(tile_key)
         if coords_match is None:
             raise ValueError(f"Tile key '{tile_key}' does not match XnYm format")
         num_columns = max(int(coords_match.group(1)) + 1, num_columns)
@@ -402,9 +414,9 @@ def _build_hdl_strings(
     )
     for tile_key, bits in tile_bits_no_mask.items():
         tile_type = spec_dict["TileMap"][tile_key]
+        frame_map_entry = spec_dict["FrameMap"].get(tile_type, {})
         if tile_type == "NULL" or (
-            len(spec_dict["FrameMap"][tile_type]) == 0
-            and not bitstream_format.include_border_rows
+            len(frame_map_entry) == 0 and not bitstream_format.include_border_rows
         ):
             continue
 
@@ -647,15 +659,15 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
 
     output_path = Path(bitstream_file)
     # Write out bitstream CSV representation
-    with output_path.with_suffix(".csv").open("w+") as f:
+    with output_path.with_suffix(".csv").open("w") as f:
         f.write(csv_str)
     # Write out HDL representations
-    with output_path.with_suffix(".vh").open("w+") as f:
+    with output_path.with_suffix(".vh").open("w") as f:
         f.write(verilog_str)
-    with output_path.with_suffix(".vhd").open("w+") as f:
+    with output_path.with_suffix(".vhd").open("w") as f:
         f.write(vhdl_str)
     # Write out binary representation
-    with output_path.open("wb") as f:
+    with output_path.with_suffix(".bin").open("wb") as f:
         f.write(bitstream_bytes)
 
 
