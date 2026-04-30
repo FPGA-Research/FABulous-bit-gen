@@ -21,14 +21,17 @@ The binary bitstream has the following structure::
     [ 4-byte desync frame           ]  — bit DESYNC_BIT set
 
 Frame-select word (32-bit big-endian):
-  - Bits [31:27] (top 5): column index in normal binary order.
-  - Bit f (counting from LSB): set to 1 to select frame index f.
-  - All other bits: 0.
+  - Bits [31:27]: column index (5 bits, normal binary order).
+  - Bits [26:21]: unused (always 0).
+  - Bit  [20]:    sync/desync flag — set only in the trailing desync frame.
+  - Bits [19:0]:  frame strobe — bit ``f`` set selects frame index ``f``
+                  (one-hot, supports up to 20 frames, indices 0–19).
 
 Frame data bytes:
-  Concatenation of FrameBitsPerRow configuration bits from every interior row
-  of that column (Y descending, border rows skipped), bit-reversed per row,
-  packed into bytes.
+  Concatenation of FrameBitsPerRow configuration bits from each emitted row
+  of that column (Y descending), bit-reversed per row, packed into bytes.
+  Emitted rows are interior-only by default, or all rows when
+  ``include_border_rows`` is enabled.
 """
 
 import argparse
@@ -54,35 +57,59 @@ except ImportError:
     logger.critical("Could not import fasm. Bitstream generation not supported.")
 
 # Bitstream format constants defaults
-COLUMN_INDEX_BITS: int = 5
+COLUMN_SELECT_BITS: int = 5
 """Default bits used to encode column index inside the frame-select word."""
 
 FRAME_SELECT_BITS: int = 32
-"""Default width of the frame-select *addressing* word (bits) prepended to each frame.
+"""Default width of each frame-address/control word (bits) prepended to each frame.
 
-This word encodes which column and which frame index is active. Its width caps
-the maximum number of frames per column: frame index ``f`` sets bit ``f``, so
-``FRAME_SELECT_BITS`` must be >= ``MAX_FRAMES_PER_COL``. Not related to the
-width of the configuration data payload (see ``FRAME_BITS_PER_ROW``).
+This word encodes the destination column and active frame strobe. The top
+``COLUMN_SELECT_BITS`` bits carry the column index; usable low bits are
+``FRAME_SELECT_BITS - COLUMN_SELECT_BITS``.
+
+Default FABulous Fabric ingress is 32-bit WriteData.
+Changing this width needs RTL/protocol changes.
 """
 
 FRAME_BITS_PER_ROW: int = 32
 """Default width of the configuration *data* payload (bits) per frame row.
 
-This is the number of configuration bits carried in each frame's data section,
-independent of the frame-select addressing word width (``FRAME_SELECT_BITS``).
-Both default to 32 in FABulous but serve different roles: ``FRAME_SELECT_BITS``
-controls addressing; ``FRAME_BITS_PER_ROW`` controls data payload size.
+This is the number of configuration bits carried in each per-row frame data
+word written after the frame-select word. In current FABulous Fabric RTL both
+address/control and data transfers use 32-bit ``WriteData`` words, so changing
+this width requires matching RTL/protocol updates.
 """
 
 MAX_FRAMES_PER_COL: int = 20
-"""Default maximum number of frames per column."""
+"""Default number of one-hot frame strobe bits used per column.
+
+Frame index ``f`` uses low bit ``f`` of the frame-select word (default range
+``0..19``).
+"""
 
 SYNC_HEADER_HEX: str = "00AAFF01000000010000000000000000FAB0FAB1"
 """Default FABulous sync header that opens every bitstream."""
 
 DESYNC_BIT: int = 20
-"""Default bit position of desync flag inside the frame-select word."""
+"""Default bit position of desync flag inside the frame-select word.
+
+With defaults, this is bit 20, above the frame strobe range (bits 0..19).
+"""
+
+
+def _parse_bool(value: bool | str, *, key_name: str) -> bool:
+    """Parse a bool field from spec values."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == "true":
+            return True
+        if normalized == "false":
+            return False
+    raise ValueError(
+        f"{key_name} must be a bool or 'True'/'False' string; got {value!r}"
+    )
 
 
 @dataclass(frozen=True)
@@ -92,7 +119,7 @@ class BitstreamFormat:
     frame_bits_per_row: int
     max_frames_per_col: int
     sync_header_hex: str
-    column_index_bits: int
+    column_select_bits: int
     frame_select_bits: int
     desync_bit: int
     include_border_rows: bool = False
@@ -112,33 +139,45 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
         for section in search_sections:
             if key in section:
                 return section[key]
-        logger.warning(f"{key} missing in bitstream spec; using default {default!r}.")
+        logger.debug(f"{key} missing in bitstream spec; using default {default!r}.")
         return default
 
     fmt = BitstreamFormat(
-        frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_BITS_PER_ROW)),
+        frame_bits_per_row=FRAME_BITS_PER_ROW,
         max_frames_per_col=int(pick("MaxFramesPerCol", MAX_FRAMES_PER_COL)),
-        sync_header_hex=str(pick("SYNC_HEADER_HEX", SYNC_HEADER_HEX)),
-        column_index_bits=int(pick("COLUMN_INDEX_BITS", COLUMN_INDEX_BITS)),
-        frame_select_bits=int(pick("FRAME_SELECT_BITS", FRAME_SELECT_BITS)),
-        desync_bit=int(pick("DESYNC_BIT", DESYNC_BIT)),
-        include_border_rows=bool(spec_dict.get("include_border_rows", False)),
+        sync_header_hex=str(pick("sync_header_hex", SYNC_HEADER_HEX)),
+        column_select_bits=int(pick("column_select_bits", COLUMN_SELECT_BITS)),
+        frame_select_bits=FRAME_SELECT_BITS,
+        desync_bit=int(pick("desync_bit", DESYNC_BIT)),
+        include_border_rows=_parse_bool(
+            spec_dict.get("include_border_rows", False),
+            key_name="include_border_rows",
+        ),
     )
-    if fmt.max_frames_per_col > fmt.frame_select_bits:
+    if fmt.column_select_bits >= fmt.frame_select_bits:
+        raise ValueError(
+            f"COLUMN_SELECT_BITS ({fmt.column_select_bits}) must be less than "
+            f"FRAME_SELECT_BITS ({fmt.frame_select_bits})"
+        )
+
+    selectable_frame_bits = fmt.frame_select_bits - fmt.column_select_bits
+    if fmt.max_frames_per_col > selectable_frame_bits:
         raise ValueError(
             f"MaxFramesPerCol ({fmt.max_frames_per_col}) exceeds "
-            f"FRAME_SELECT_BITS ({fmt.frame_select_bits}): frame index would "
-            "overflow the frame-select word"
+            "FRAME_SELECT_BITS minus COLUMN_SELECT_BITS "
+            f"({selectable_frame_bits}): frame index would overlap the "
+            "column index bits"
         )
-    if fmt.column_index_bits >= fmt.frame_select_bits:
+    if fmt.desync_bit < fmt.max_frames_per_col:
         raise ValueError(
-            f"COLUMN_INDEX_BITS ({fmt.column_index_bits}) must be less than "
-            f"FRAME_SELECT_BITS ({fmt.frame_select_bits})"
+            f"DESYNC_BIT ({fmt.desync_bit}) must be >= MaxFramesPerCol "
+            f"({fmt.max_frames_per_col}) so it does not overlap frame strobe bits"
         )
-    if fmt.desync_bit >= fmt.frame_select_bits:
+    if fmt.desync_bit >= selectable_frame_bits:
         raise ValueError(
             f"DESYNC_BIT ({fmt.desync_bit}) must be less than "
-            f"FRAME_SELECT_BITS ({fmt.frame_select_bits})"
+            f"{selectable_frame_bits} so it does not overlap "
+            "the column select bits in the frame-select word"
         )
     return fmt
 
@@ -365,7 +404,7 @@ def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
     tile_coord_re: re.Pattern = re.compile(r"X(\d+)Y(\d+)")
 
     for tile_key in tile_bits:
-        coords_match = tile_coord_re.match(tile_key)
+        coords_match = tile_coord_re.fullmatch(tile_key)
         if coords_match is None:
             raise ValueError(f"Tile key '{tile_key}' does not match XnYm format")
         num_columns = max(int(coords_match.group(1)) + 1, num_columns)
@@ -496,7 +535,7 @@ def _build_csv_and_frame_data(
     for y in range(start_row, stop_row, -1):
         for x in range(num_columns):
             tile_key = f"X{x}Y{y}"
-            tile_type = spec_dict["TileMap"][tile_key]
+            tile_type = spec_dict["TileMap"].get(tile_key, "NULL")
 
             tile_csv = f"{tile_key},{tile_type},{x},{y}\n"
 
@@ -505,6 +544,11 @@ def _build_csv_and_frame_data(
                     # NULL get an all-zero row
                     frame_bits = "0" * bitstream_format.frame_bits_per_row
                 else:
+                    if tile_key not in tile_bits:
+                        raise SpecMissMatch(
+                            "Tile location "
+                            f"'{tile_key}' missing from initialized tile bits"
+                        )
                     # Slice this frame's bits from the flat per-tile array and
                     # bit-reverse: the spec stores bits in frame-ascending order
                     # but we need them reversed within each row.
@@ -538,7 +582,7 @@ def _build_binary_bitstream(
     Prepends the 20-byte FABulous sync header, then for every column and
     each frame present in ``bit_array[col]`` emits a 32-bit frame-select
     word followed by the frame's data bytes. The frame-select word places
-    the column index in the top ``COLUMN_INDEX_BITS`` bits and sets bit
+    the column index in the top ``COLUMN_SELECT_BITS`` bits and sets bit
     ``frame_idx`` (one-hot) to identify the active frame.
     Finally appends the desync frame with bit ``DESYNC_BIT`` set.
 
@@ -571,7 +615,7 @@ def _build_binary_bitstream(
                 col
                 << (
                     bitstream_format.frame_select_bits
-                    - bitstream_format.column_index_bits
+                    - bitstream_format.column_select_bits
                 )
             ) | (1 << frame_idx)
             bitstream += frame_select_word.to_bytes(
@@ -619,7 +663,7 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     ValueError
         If the resolved bitstream format is invalid (e.g. ``MaxFramesPerCol``
         exceeds ``FRAME_SELECT_BITS``, or the grid is wider than
-        ``COLUMN_INDEX_BITS`` can address).
+        ``COLUMN_SELECT_BITS`` can address).
     """
     canon_list = _parse_fasm_to_canon_list(fasm_file)
     if not canon_list:
@@ -635,11 +679,11 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
-    max_addressable_columns = 2**bitstream_format.column_index_bits
+    max_addressable_columns = 2**bitstream_format.column_select_bits
     if num_columns > max_addressable_columns:
         raise ValueError(
-            f"Grid has {num_columns} columns but COLUMN_INDEX_BITS "
-            f"({bitstream_format.column_index_bits}) can only address "
+            f"Grid has {num_columns} columns but COLUMN_SELECT_BITS "
+            f"({bitstream_format.column_select_bits}) can only address "
             f"{max_addressable_columns}: column index would overflow "
             "the frame-select word"
         )
