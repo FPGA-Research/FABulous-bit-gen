@@ -8,7 +8,7 @@ import pytest
 from fasm import FasmLine, SetFasmFeature
 
 from fabulous_bit_gen.bit_gen import (
-    COLUMN_SELECT_BITS,
+    FRAME_SELECT_WIDTH,
     DESYNC_BIT,
     FRAME_SELECT_BITS,
     MAX_FRAMES_PER_COL,
@@ -486,7 +486,7 @@ class TestGenBitstreamFasmProcessing:
         """
         spec_dict = {
             "sync_header_hex": SYNC_HEADER_HEX,
-            "column_select_bits": COLUMN_SELECT_BITS,
+            "frame_select_width": FRAME_SELECT_WIDTH,
             "frame_select_bits": FRAME_SELECT_BITS,
             "desync_bit": DESYNC_BIT,
             **spec_dict,
@@ -1135,13 +1135,13 @@ class TestGenBitstreamFaultCases:
         assert resolved.frame_bits_per_row == FRAME_SELECT_BITS
         assert resolved.max_frames_per_col == MAX_FRAMES_PER_COL
         assert resolved.sync_header_hex == SYNC_HEADER_HEX
-        assert resolved.column_select_bits == COLUMN_SELECT_BITS
+        assert resolved.frame_select_width == FRAME_SELECT_WIDTH
         assert resolved.frame_select_bits == FRAME_SELECT_BITS
         assert resolved.desync_bit == DESYNC_BIT
         assert mock_logger.debug.call_count == 4
 
     def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
-        """MaxFramesPerCol > (FRAME_SELECT_BITS - COLUMN_SELECT_BITS) raises ValueError."""
+        """MaxFramesPerCol > (FRAME_SELECT_BITS - FRAME_SELECT_WIDTH) raises ValueError."""
         with pytest.raises(
             ValueError, match="MaxFramesPerCol.*exceeds.*FRAME_SELECT_BITS"
         ):
@@ -1152,12 +1152,12 @@ class TestGenBitstreamFaultCases:
                 }
             )
 
-    def test_resolve_format_raises_when_column_select_bits_too_large(self) -> None:
-        """COLUMN_SELECT_BITS >= FRAME_SELECT_BITS should raise ValueError."""
-        with pytest.raises(ValueError, match="COLUMN_SELECT_BITS.*must be less than"):
+    def test_resolve_format_raises_when_frame_select_width_too_large(self) -> None:
+        """FRAME_SELECT_WIDTH >= FRAME_SELECT_BITS should raise ValueError."""
+        with pytest.raises(ValueError, match="FRAME_SELECT_WIDTH.*must be less than"):
             _resolve_bitstream_format(
                 {
-                    "column_select_bits": 32,
+                    "frame_select_width": 32,
                     "frame_select_bits": 32,
                 }
             )
@@ -1165,12 +1165,7 @@ class TestGenBitstreamFaultCases:
     def test_resolve_format_raises_when_desync_bit_too_large(self) -> None:
         """DESYNC_BIT >= selectable frame bits should raise ValueError."""
         with pytest.raises(ValueError, match="DESYNC_BIT.*must be less than"):
-            _resolve_bitstream_format(
-                {
-                    "desync_bit": 32,
-                    "frame_select_bits": 32,
-                }
-            )
+            _resolve_bitstream_format({"desync_bit": 32})
 
     def test_resolve_format_raises_when_desync_bit_overlaps_frame_strobe(self) -> None:
         """DESYNC_BIT inside frame strobe range should raise ValueError."""
@@ -1182,17 +1177,17 @@ class TestGenBitstreamFaultCases:
                     "MaxFramesPerCol": 21,
                     "desync_bit": 20,
                     "frame_select_bits": 32,
-                    "column_select_bits": 5,
+                    "frame_select_width": 5,
                 }
             )
 
-    def test_genbitstream_raises_when_grid_wider_than_column_select_bits(
+    def test_genbitstream_raises_when_grid_wider_than_frame_select_width(
         self, temp_output_dir, mocker
     ) -> None:
-        """Grid with more columns than COLUMN_SELECT_BITS can address should raise."""
-        # COLUMN_SELECT_BITS=2 -> max 4 columns; grid has 5 (X0-X4)
+        """Grid with more columns than FRAME_SELECT_WIDTH can address should raise."""
+        # FRAME_SELECT_WIDTH=2 -> max 4 columns; grid has 5 (X0-X4)
         spec_dict = {
-            "column_select_bits": 2,
+            "frame_select_width": 2,
             "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
             "TileMap": {f"X{x}Y{y}": "NULL" for x in range(5) for y in range(3)},
             "TileSpecs": {f"X{x}Y{y}": {} for x in range(5) for y in range(3)},
@@ -1208,7 +1203,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        with pytest.raises(ValueError, match="columns.*COLUMN_SELECT_BITS"):
+        with pytest.raises(ValueError, match="columns.*FRAME_SELECT_WIDTH"):
             genBitstream(
                 str(temp_output_dir / "test.fasm"),
                 str(spec_file),
@@ -2368,7 +2363,7 @@ class TestGenBitstreamBinaryOutput:
             **minimal_spec_dict,
             "ArchSpecs": {"MaxFramesPerCol": 1, "FrameBitsPerRow": 16},
             "sync_header_hex": "A1B2C3D4",
-            "column_select_bits": 4,
+            "frame_select_width": 4,
             "frame_select_bits": 16,
             "desync_bit": 7,
         }
