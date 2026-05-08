@@ -58,18 +58,10 @@ except ImportError:
 
 # Bitstream format constants defaults
 FRAME_BITS_PER_ROW: int = 32
-"""Default width of the configuration *data* payload (bits) per frame row.
-
-This is the width of both frame-select and frame-data words at the RTL boundary
-(``FrameBitsPerRow`` / ``WriteData``).
-"""
+"""Default width of the both frame-select and frame-data words."""
 
 FRAME_SELECT_WIDTH: int = 5
-"""Width of the column-index field in the frame-select word (RTL: ``FrameSelectWidth``).
-
-The top ``FRAME_SELECT_WIDTH`` bits of the frame-select word carry the column
-index; the remaining low bits are available for the frame strobe and desync flag.
-"""
+"""Width of the column-index field in the frame-select word."""
 
 MAX_FRAMES_PER_COL: int = 20
 """Default number of one-hot frame strobe bits used per column."""
@@ -78,11 +70,10 @@ SYNC_HEADER_HEX: str = "00AAFF01000000010000000000000000FAB0FAB1"
 """Default FABulous sync header that opens every bitstream."""
 
 DESYNC_BIT: int = 20
-"""Bit position of the desync flag inside the frame-select word (RTL: ``desync_flag``).
+"""Bit position of the desync flag inside the frame-select word.
 
-ConfigFSM checks ``WriteData[desync_flag]``; when set the FSM desyncs and returns
-to its idle state. Must be >= ``MaxFramesPerCol`` (outside the frame strobe range)
-and < ``FRAME_BITS_PER_ROW - FRAME_SELECT_WIDTH`` (outside the column-index field).
+Must be >= MaxFramesPerCol (outside frame strobe range)
+and < FRAME_BITS_PER_ROW - FRAME_SELECT_WIDTH (outside column-index field).
 """
 
 
@@ -250,11 +241,6 @@ def _apply_fasm_features(
     written into both ``tile_bits`` (masked) and ``tile_bits_no_mask``
     (unmasked) using the values stored in the spec.
 
-    A warning is emitted via ``logger.warning`` whenever a bit that was
-    already written is overwritten, both for ``tile_bits`` (masked) and
-    ``tile_bits_no_mask`` (unmasked), indicating that two FASM features
-    compete for the same configuration bit.
-
     Parameters
     ----------
     canon_list : list[FasmLine]
@@ -304,8 +290,6 @@ def _apply_fasm_features(
                 f"Tile location {tile_loc} not found in the bitstream spec"
             )
 
-        # Set the necessary bits high
-        tile_type = spec_dict["TileMap"][tile_loc]
         if tile_loc not in spec_dict["TileSpecs"]:
             raise SpecMissMatch(f"Tile location '{tile_loc}' not found in TileSpecs")
         if feature_name in spec_dict["TileSpecs"][tile_loc]:
@@ -346,6 +330,7 @@ def _apply_fasm_features(
                     touched_bits_no_mask[tile_loc].add(bit_idx)
                     tile_bits_no_mask[tile_loc][bit_idx] = new_val
         else:
+            tile_type = spec_dict["TileMap"][tile_loc]
             raise SpecMissMatch(
                 f"Tile type: {tile_type}\n"
                 f"with location {tile_loc} and \n"
@@ -447,11 +432,9 @@ def _build_hdl_strings(
             f'{total_bits}-1 downto 0) := "'
         )
 
-        for i in range(total_bits - 1, -1, -1):
-            verilog_str += str(bits[i])
-            vhdl_str += str(bits[i])
-        verilog_str += "\n"
-        vhdl_str += '";\n'
+        bit_vec = "".join(map(str, reversed(bits)))
+        verilog_str += bit_vec + "\n"
+        vhdl_str += bit_vec + '";\n'
     vhdl_str += "end package emulate_bitstream;"
     return verilog_str, vhdl_str
 
@@ -495,7 +478,6 @@ def _build_csv_and_frame_data(
         column/frame combination, ready for binary assembly.
     """
     csv_str = ""
-    # bit_array[col][frame] accumulates packed bytes from every row in that column.
     bit_array = [
         [b"" for _ in range(bitstream_format.max_frames_per_col)]
         for _ in range(num_columns)
@@ -510,7 +492,6 @@ def _build_csv_and_frame_data(
         start_row = num_rows - 2
         stop_row = 0
 
-    # Rows are written top-to-bottom in the CSV
     for y in range(start_row, stop_row, -1):
         for x in range(num_columns):
             tile_key = f"X{x}Y{y}"
@@ -520,7 +501,6 @@ def _build_csv_and_frame_data(
 
             for frame_idx in range(bitstream_format.max_frames_per_col):
                 if tile_type == "NULL":
-                    # NULL get an all-zero row
                     frame_bits = "0" * bitstream_format.frame_bits_per_row
                 else:
                     if tile_key not in tile_bits:
@@ -542,8 +522,6 @@ def _build_csv_and_frame_data(
                     f"{bitstream_format.frame_bits_per_row},{frame_bits}\n"
                 )
 
-                # Append this row's contribution; the full column/frame payload
-                # is the concatenation of all rows processed in this loop.
                 bit_array[x][frame_idx] += bitstring_to_bytes(frame_bits)
 
             csv_str += tile_csv + "\n"
@@ -685,15 +663,12 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     )
 
     output_path = Path(bitstream_file)
-    # Write out bitstream CSV representation
     with output_path.with_suffix(".csv").open("w") as f:
         f.write(csv_str)
-    # Write out HDL representations
     with output_path.with_suffix(".vh").open("w") as f:
         f.write(verilog_str)
     with output_path.with_suffix(".vhd").open("w") as f:
         f.write(vhdl_str)
-    # Write out binary representation
     with output_path.with_suffix(".bin").open("wb") as f:
         f.write(bitstream_bytes)
 
