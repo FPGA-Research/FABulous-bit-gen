@@ -73,6 +73,7 @@ class BitstreamFormat:
     frame_select_width: int
     desync_bit: int
     include_border_rows: bool = False
+    fabulous_version: str = "1.0"
 
 
 def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
@@ -100,6 +101,10 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
 
         return cast(value)
 
+    fabulous_version = str(spec_dict.get("FABulousVersion", "1.0"))
+    if "FABulousVersion" not in spec_dict:
+        logger.debug("FABulousVersion missing in spec; using default '1.0'.")
+
     fmt = BitstreamFormat(
         frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_BITS_PER_ROW, int)),
         max_frames_per_col=int(pick("MaxFramesPerCol", MAX_FRAMES_PER_COL, int)),
@@ -107,6 +112,7 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
         frame_select_width=int(pick("FrameSelectWidth", FRAME_SELECT_WIDTH, int)),
         desync_bit=int(pick("DesyncBit", DESYNC_BIT, int)),
         include_border_rows=bool(pick("IncludeBorderRows", False, bool)),
+        fabulous_version=fabulous_version,
     )
 
     if fmt.frame_select_width + 1 > fmt.frame_bits_per_row:

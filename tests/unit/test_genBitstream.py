@@ -1130,7 +1130,17 @@ class TestGenBitstreamFaultCases:
         assert resolved.sync_header_hex == SYNC_HEADER_HEX
         assert resolved.frame_select_width == FRAME_SELECT_WIDTH
         assert resolved.desync_bit == DESYNC_BIT
-        assert mock_logger.debug.call_count == 6
+        assert resolved.fabulous_version == "1.0"
+        assert mock_logger.debug.call_count == 7
+
+    def test_resolve_format_uses_fabulous_version_from_spec(self, mocker) -> None:
+        """FABulousVersion present in spec should be used as-is."""
+        mocker.patch("fabulous_bit_gen.bit_gen.logger")
+        resolved = _resolve_bitstream_format(
+            {"FABulousVersion": "2.0", "ArchSpecs": {}}
+        )
+
+        assert resolved.fabulous_version == "2.0"
 
     def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
         """MaxFramesPerCol exceeding selectable frame bits raises ValueError."""
