@@ -62,6 +62,8 @@ Must be >= MaxFramesPerCol (outside frame strobe range)
 and < FRAME_BITS_PER_ROW - FRAME_SELECT_WIDTH (outside column-index field).
 """
 
+FABULOUS_VERSION: str = "1.0"
+"""Default FABulous version string."""
 
 @dataclass(frozen=True)
 class BitstreamFormat:
@@ -79,40 +81,24 @@ class BitstreamFormat:
 def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
     """Resolve bitstream-format settings from spec dict once with fallbacks."""
 
-    def pick(key: str, default: int | str | bool, cast: type) -> int | str | bool:
-        """Pick a value from the spec dict and cast it to a given type."""
+    def pick(key: str, default: int | str | bool) -> int | str | bool:
+        """Return key from ArchSpecs, then spec_dict top level, then default."""
         arch_specs = spec_dict.get("ArchSpecs", {})
         if key in arch_specs:
-            value = arch_specs[key]
-        else:
-            value = default
-            logger.debug(f"{key} missing in bitstream spec; using default {default!r}.")
-
-        if cast is bool:
-            if isinstance(value, bool):
-                return value
-            if isinstance(value, str):
-                normalized = value.strip().lower()
-                if normalized in ("true", "false"):
-                    return normalized == "true"
-            raise ValueError(
-                f"{key} must be a bool or 'True'/'False' string; got {value!r}"
-            )
-
-        return cast(value)
-
-    fabulous_version = str(spec_dict.get("FABulousVersion", "1.0"))
-    if "FABulousVersion" not in spec_dict:
-        logger.debug("FABulousVersion missing in spec; using default '1.0'.")
+            return arch_specs[key]
+        if key in spec_dict:
+            return spec_dict[key]
+        logger.debug(f"{key} missing in bitstream spec; using default {default!r}.")
+        return default
 
     fmt = BitstreamFormat(
-        frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_BITS_PER_ROW, int)),
-        max_frames_per_col=int(pick("MaxFramesPerCol", MAX_FRAMES_PER_COL, int)),
-        sync_header_hex=str(pick("SyncHeaderHex", SYNC_HEADER_HEX, str)),
-        frame_select_width=int(pick("FrameSelectWidth", FRAME_SELECT_WIDTH, int)),
-        desync_bit=int(pick("DesyncBit", DESYNC_BIT, int)),
-        include_border_rows=bool(pick("IncludeBorderRows", False, bool)),
-        fabulous_version=fabulous_version,
+        frame_bits_per_row=int(pick("FrameBitsPerRow", FRAME_BITS_PER_ROW)),
+        max_frames_per_col=int(pick("MaxFramesPerCol", MAX_FRAMES_PER_COL)),
+        sync_header_hex=str(pick("SyncHeaderHex", SYNC_HEADER_HEX)),
+        frame_select_width=int(pick("FrameSelectWidth", FRAME_SELECT_WIDTH)),
+        desync_bit=int(pick("DesyncBit", DESYNC_BIT)),
+        include_border_rows=bool(pick("IncludeBorderRows", False)),
+        fabulous_version=str(pick("FABulousVersion", FABULOUS_VERSION)),
     )
 
     if fmt.frame_select_width + 1 > fmt.frame_bits_per_row:
