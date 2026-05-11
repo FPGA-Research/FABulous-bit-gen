@@ -167,34 +167,6 @@ def _parse_fasm_to_canon_list(fasm_file: str) -> list:
     return list(parse_fasm_string(canonical_str))
 
 
-def _init_tile_bits(
-    spec_dict: dict,
-    bitstream_format: BitstreamFormat,
-) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
-    """Allocate zero-filled bit arrays for masked and unmasked (No_Mask) bitstreams.
-
-    Parameters
-    ----------
-    spec_dict : dict
-        Must contain ``TileMap``.
-    bitstream_format : BitstreamFormat
-        Supplies ``MaxFramesPerCol`` and ``FrameBitsPerRow`` for allocation size.
-
-    Returns
-    -------
-    tuple[dict[str, list[int]], dict[str, list[int]]]
-        ``(tile_bits, tile_bits_no_mask)``, each mapping tile keys to a
-        zero-filled list of length ``MaxFramesPerCol * FrameBitsPerRow``.
-    """
-    total_bits = (
-        bitstream_format.max_frames_per_col * bitstream_format.frame_bits_per_row
-    )
-
-    tile_bits = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
-    tile_bits_no_mask = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
-    return tile_bits, tile_bits_no_mask
-
-
 def _apply_fasm_features(
     canon_list: list[FasmLine],
     spec_dict: dict,
@@ -223,8 +195,7 @@ def _apply_fasm_features(
         If a tile location or feature name is missing from the spec.
     """
     # Track which bit indices have already been written for each tile so that
-    # overwrites are detected regardless of the bit value (a feature can
-    # legitimately map a bit to 0, making a value-based sentinel unreliable).
+    # overwrites are detected regardless of the bit value.
     touched_bits: dict[str, set] = {tile: set() for tile in tile_bits}
     touched_bits_no_mask: dict[str, set] = {tile: set() for tile in tile_bits_no_mask}
 
@@ -258,6 +229,10 @@ def _apply_fasm_features(
 
         tile_spec = spec_dict["TileSpecs"][tile_loc]
         spec_feature_name = feature_name
+
+        # Workaround for a I0mux naming inconsistency in older FABulous versions.
+        # This has been resolved in newer nextpnr and FABulous versions,
+        # but we have to remap the feature name for compatibility with older specs.
         if (
             "I0mux" in feature_name
             and feature_name not in tile_spec
@@ -510,11 +485,10 @@ def _build_binary_bitstream(
     bytes
         Complete binary bitstream.
     """
-    # Add sync header at the start of the bitstream
+    # Add sync header at the start
     bitstream = bytes.fromhex(bitstream_format.sync_header_hex)
 
-    # Emit one (frame-select word + frame data) pair per frame per column.
-    # Columns are written left-to-right; frames top-to-bottom within each column.
+    # Add one (frame-select word + frame data) pair per frame per column.
     for col in range(num_columns):
         for frame_idx, frame_data in enumerate(bit_array[col]):
             # Frame-select word: column in top bits (address),
@@ -532,7 +506,7 @@ def _build_binary_bitstream(
             # Frame data: packed config bits for this column/frame across all rows
             bitstream += frame_data
 
-    # Desync frame signals end-of-bitstream to the configuration engine.
+    # Desync frame signals end-of-bitstream.
     desync_frame = (1 << bitstream_format.desync_bit).to_bytes(
         math.ceil(bitstream_format.frame_bits_per_row / 8), byteorder="big"
     )
@@ -569,7 +543,14 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         spec_dict = pickle.load(f)
 
     bitstream_format = _resolve_bitstream_format(spec_dict)
-    tile_bits, tile_bits_no_mask = _init_tile_bits(spec_dict, bitstream_format)
+
+    # initialized zero-filled bit arrays for masked and unmasked bitstreams
+    total_bits = (
+        bitstream_format.max_frames_per_col * bitstream_format.frame_bits_per_row
+    )
+    tile_bits = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
+    tile_bits_no_mask = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
+
     _apply_fasm_features(
         canon_list, spec_dict, tile_bits, tile_bits_no_mask, bitstream_format
     )
