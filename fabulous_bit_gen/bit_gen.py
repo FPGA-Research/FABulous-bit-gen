@@ -80,12 +80,11 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
 
     def pick(key: str, default: int | str | bool, cast: type) -> int | str | bool:
         """Pick a value from the spec dict and cast it to a given type."""
-        value = default
-        for section in spec_dict.get("ArchSpecs", {}):
-            if key in section:
-                value = section[key]
-                break
+        arch_specs = spec_dict.get("ArchSpecs", {})
+        if key in arch_specs:
+            value = arch_specs[key]
         else:
+            value = default
             logger.debug(f"{key} missing in bitstream spec; using default {default!r}.")
 
         if cast is bool:

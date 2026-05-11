@@ -9,7 +9,7 @@ from fasm import FasmLine, SetFasmFeature
 
 from fabulous_bit_gen.bit_gen import (
     DESYNC_BIT,
-    FRAME_SELECT_BITS,
+    FRAME_BITS_PER_ROW,
     FRAME_SELECT_WIDTH,
     MAX_FRAMES_PER_COL,
     SYNC_HEADER_HEX,
@@ -484,13 +484,6 @@ class TestGenBitstreamFasmProcessing:
 
         Returns mock_logger.
         """
-        spec_dict = {
-            "sync_header_hex": SYNC_HEADER_HEX,
-            "frame_select_width": FRAME_SELECT_WIDTH,
-            "frame_select_bits": FRAME_SELECT_BITS,
-            "desync_bit": DESYNC_BIT,
-            **spec_dict,
-        }
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
         output_file = temp_output_dir / "output.bin"
@@ -1132,50 +1125,43 @@ class TestGenBitstreamFaultCases:
         mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
         resolved = _resolve_bitstream_format({"ArchSpecs": {}})
 
-        assert resolved.frame_bits_per_row == FRAME_SELECT_BITS
+        assert resolved.frame_bits_per_row == FRAME_BITS_PER_ROW
         assert resolved.max_frames_per_col == MAX_FRAMES_PER_COL
         assert resolved.sync_header_hex == SYNC_HEADER_HEX
         assert resolved.frame_select_width == FRAME_SELECT_WIDTH
-        assert resolved.frame_select_bits == FRAME_SELECT_BITS
         assert resolved.desync_bit == DESYNC_BIT
-        assert mock_logger.debug.call_count == 4
+        assert mock_logger.debug.call_count == 6
 
     def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
         """MaxFramesPerCol exceeding selectable frame bits raises ValueError."""
-        with pytest.raises(
-            ValueError, match="MaxFramesPerCol.*exceeds.*FRAME_SELECT_BITS"
-        ):
+        with pytest.raises(ValueError, match="MaxFramesPerCol.*exceeds"):
             _resolve_bitstream_format(
-                {
-                    "MaxFramesPerCol": 33,
-                    "frame_select_bits": 32,
-                }
+                {"ArchSpecs": {"MaxFramesPerCol": 33, "FrameBitsPerRow": 32}}
             )
 
     def test_resolve_format_raises_when_frame_select_width_too_large(self) -> None:
-        """FRAME_SELECT_WIDTH >= FRAME_SELECT_BITS should raise ValueError."""
+        """FrameSelectWidth >= FrameBitsPerRow should raise ValueError."""
         with pytest.raises(ValueError, match="FRAME_SELECT_WIDTH.*must be less than"):
             _resolve_bitstream_format(
-                {
-                    "frame_select_width": 32,
-                    "frame_select_bits": 32,
-                }
+                {"ArchSpecs": {"FrameSelectWidth": 32, "FrameBitsPerRow": 32}}
             )
 
     def test_resolve_format_raises_when_desync_bit_too_large(self) -> None:
         """DESYNC_BIT >= selectable frame bits should raise ValueError."""
         with pytest.raises(ValueError, match="DESYNC_BIT.*must be less than"):
-            _resolve_bitstream_format({"desync_bit": 32})
+            _resolve_bitstream_format({"ArchSpecs": {"DesyncBit": 32}})
 
     def test_resolve_format_raises_when_desync_bit_overlaps_frame_strobe(self) -> None:
         """DESYNC_BIT inside frame strobe range should raise ValueError."""
         with pytest.raises(ValueError, match="DESYNC_BIT.*must be >= MaxFramesPerCol"):
             _resolve_bitstream_format(
                 {
-                    "MaxFramesPerCol": 21,
-                    "desync_bit": 20,
-                    "frame_select_bits": 32,
-                    "frame_select_width": 5,
+                    "ArchSpecs": {
+                        "MaxFramesPerCol": 21,
+                        "DesyncBit": 20,
+                        "FrameBitsPerRow": 32,
+                        "FrameSelectWidth": 5,
+                    }
                 }
             )
 
@@ -1185,8 +1171,11 @@ class TestGenBitstreamFaultCases:
         """Grid with more columns than FRAME_SELECT_WIDTH can address should raise."""
         # FRAME_SELECT_WIDTH=2 -> max 4 columns; grid has 5 (X0-X4)
         spec_dict = {
-            "frame_select_width": 2,
-            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "ArchSpecs": {
+                "MaxFramesPerCol": 20,
+                "FrameBitsPerRow": 32,
+                "FrameSelectWidth": 2,
+            },
             "TileMap": {f"X{x}Y{y}": "NULL" for x in range(5) for y in range(3)},
             "TileSpecs": {f"X{x}Y{y}": {} for x in range(5) for y in range(3)},
             "TileSpecs_No_Mask": {f"X{x}Y{y}": {} for x in range(5) for y in range(3)},
@@ -2353,17 +2342,19 @@ class TestGenBitstreamBinaryOutput:
         # + 4-byte desync frame.
         assert len(content) == 20 + (2 * 3 * (4 + 4)) + 4
 
-    def test_bitstream_ignores_spec_overrides_for_hard_width_constants(
+    def test_bitstream_honors_spec_overrides_for_format_constants(
         self, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
-        """Hard protocol widths should stay at module constants."""
+        """ArchSpecs format overrides should be reflected in the output bitstream."""
         spec_dict = {
             **minimal_spec_dict,
-            "ArchSpecs": {"MaxFramesPerCol": 1, "FrameBitsPerRow": 16},
-            "sync_header_hex": "A1B2C3D4",
-            "frame_select_width": 4,
-            "frame_select_bits": 16,
-            "desync_bit": 7,
+            "ArchSpecs": {
+                "MaxFramesPerCol": 1,
+                "FrameBitsPerRow": 16,
+                "SyncHeaderHex": "A1B2C3D4",
+                "FrameSelectWidth": 4,
+                "DesyncBit": 7,
+            },
         }
         spec_file = temp_output_dir / "spec.bin"
         fasm_file = temp_output_dir / "test.fasm"
@@ -2382,10 +2373,10 @@ class TestGenBitstreamBinaryOutput:
             content = f.read()
 
         assert content.startswith(bytes.fromhex("A1B2C3D4"))
-        assert content.endswith((1 << 7).to_bytes(4, byteorder="big"))
-        # 4-byte header + (2 cols * 1 frame * (4-byte frame-select + 4-byte data))
-        # + 4-byte desync frame.
-        assert len(content) == 4 + (2 * 1 * (4 + 4)) + 4
+        assert content.endswith((1 << 7).to_bytes(2, byteorder="big"))
+        # 4-byte header + (2 cols * 1 frame * (2-byte frame-select + 2-byte data))
+        # + 2-byte desync frame (FrameBitsPerRow=16 → word_bytes=2).
+        assert len(content) == 4 + (2 * 1 * (2 + 2)) + 2
 
 
 class TestGenBitstreamBitManipulation:
