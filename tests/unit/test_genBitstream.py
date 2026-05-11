@@ -8,9 +8,9 @@ import pytest
 from fasm import FasmLine, SetFasmFeature
 
 from fabulous_bit_gen.bit_gen import (
-    FRAME_SELECT_WIDTH,
     DESYNC_BIT,
     FRAME_SELECT_BITS,
+    FRAME_SELECT_WIDTH,
     MAX_FRAMES_PER_COL,
     SYNC_HEADER_HEX,
     _resolve_bitstream_format,
@@ -1141,7 +1141,7 @@ class TestGenBitstreamFaultCases:
         assert mock_logger.debug.call_count == 4
 
     def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
-        """MaxFramesPerCol > (FRAME_SELECT_BITS - FRAME_SELECT_WIDTH) raises ValueError."""
+        """MaxFramesPerCol exceeding selectable frame bits raises ValueError."""
         with pytest.raises(
             ValueError, match="MaxFramesPerCol.*exceeds.*FRAME_SELECT_BITS"
         ):
@@ -1169,9 +1169,7 @@ class TestGenBitstreamFaultCases:
 
     def test_resolve_format_raises_when_desync_bit_overlaps_frame_strobe(self) -> None:
         """DESYNC_BIT inside frame strobe range should raise ValueError."""
-        with pytest.raises(
-            ValueError, match="DESYNC_BIT.*must be >= MaxFramesPerCol"
-        ):
+        with pytest.raises(ValueError, match="DESYNC_BIT.*must be >= MaxFramesPerCol"):
             _resolve_bitstream_format(
                 {
                     "MaxFramesPerCol": 21,

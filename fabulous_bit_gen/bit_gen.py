@@ -2,16 +2,7 @@
 
 """Bitstream generation utilities for FABulous FPGA fabrics.
 
-This module provides functionality for generating bitstreams from FASM (FPGA Assembly)
-files for FABulous FPGA fabrics. It handles the conversion of place-and-route results
-into configuration bitstreams that can be loaded onto the FPGA fabric.
-
-The module includes functions for parsing FASM files, processing configuration bits, and
-generating the final bitstream output in various formats.
-
-Bitstream format
-----------------
-The binary bitstream has the following structure::
+Binary bitstream structure::
 
     [ 20-byte sync header           ]
     for each column (x = 0 … num_columns-1):
@@ -52,7 +43,6 @@ from loguru import logger
 
 from fabulous_bit_gen.custom_exception import SpecMissMatch
 
-# Bitstream format constants defaults
 FRAME_BITS_PER_ROW: int = 32
 """Default width of the both frame-select and frame-data words."""
 
@@ -149,17 +139,17 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
 
 
 def bitstring_to_bytes(s: str) -> bytes:
-    """Convert binary string to bytes.
+    """Convert a binary string to big-endian bytes.
 
     Parameters
     ----------
     s : str
-        Binary string (e.g., '10110101')
+        Binary string, e.g. ``'10110101'``.
 
     Returns
     -------
     bytes
-        Byte representation of the binary string
+        Big-endian representation, padded to ``ceil(len(s) / 8)`` bytes.
     """
     return int(s, 2).to_bytes(math.ceil(len(s) / 8), byteorder="big")
 
@@ -167,19 +157,17 @@ def bitstring_to_bytes(s: str) -> bytes:
 def _parse_fasm_to_canon_list(fasm_file: str) -> list:
     """Parse a FASM file and return its canonicalised feature list.
 
-    Reads the raw FASM file, converts it to canonical form (which resolves
-    any shorthand and normalises feature values), then parses that canonical
-    string back into a list of FasmLine objects ready for processing.
+    Two-pass: raw parse → canonical string → re-parse to resolve shorthand.
 
     Parameters
     ----------
     fasm_file : str
-        Path to the FASM file to parse.
+        Path to the FASM file.
 
     Returns
     -------
     list
-        Canonicalised list of FASM lines parsed from the file.
+        Canonicalised list of ``FasmLine`` objects.
     """
     fasm_lines = parse_fasm_filename(fasm_file)
     canonical_str = fasm_tuple_to_string(fasm_lines, True)
@@ -190,28 +178,20 @@ def _init_tile_bits(
     spec_dict: dict,
     bitstream_format: BitstreamFormat,
 ) -> tuple[dict[str, list[int]], dict[str, list[int]]]:
-    """Initialise per-tile bit arrays to all zeros.
-
-    Allocates two flat integer lists of length
-    ``MaxFramesPerCol * FrameBitsPerRow`` for every tile in ``TileMap``:
-    one for the masked bitstream written to the binary output, and one for
-    the unmasked (No_Mask) bitstream used by the HDL emulation constants.
+    """Allocate zero-filled bit arrays for masked and unmasked (No_Mask) bitstreams.
 
     Parameters
     ----------
     spec_dict : dict
-        Bitstream specification dictionary loaded from the pickle spec file.
         Must contain ``TileMap``.
     bitstream_format : BitstreamFormat
-        Resolved wire-format settings supplying ``MaxFramesPerCol`` and
-        ``FrameBitsPerRow`` for the allocation size.
+        Supplies ``MaxFramesPerCol`` and ``FrameBitsPerRow`` for allocation size.
 
     Returns
     -------
     tuple[dict[str, list[int]], dict[str, list[int]]]
-        A pair ``(tile_bits, tile_bits_no_mask)``, each mapping tile location
-        strings (e.g. ``'X1Y2'``) to a zero-filled integer list of length
-        ``MaxFramesPerCol * FrameBitsPerRow``.
+        ``(tile_bits, tile_bits_no_mask)``, each mapping tile keys to a
+        zero-filled list of length ``MaxFramesPerCol * FrameBitsPerRow``.
     """
     total_bits = (
         bitstream_format.max_frames_per_col * bitstream_format.frame_bits_per_row
@@ -228,32 +208,23 @@ def _apply_fasm_features(
     tile_bits: dict[str, list[int]],
     tile_bits_no_mask: dict[str, list[int]],
 ) -> None:
-    """Apply FASM feature lines to the tile bit arrays in place.
-
-    Iterates over every canonicalised FASM line, skipping comment/annotation
-    lines (``set_feature is None``) and any feature whose name contains
-    ``'CLK'``.  For each remaining feature the tile location and feature name
-    are resolved against ``TileSpecs`` and the corresponding bit indices are
-    written into both ``tile_bits`` (masked) and ``tile_bits_no_mask``
-    (unmasked) using the values stored in the spec.
+    """Apply FASM features to tile bit arrays in place. Skips CLK features.
 
     Parameters
     ----------
     canon_list : list[FasmLine]
-        Canonicalised FASM lines as returned by ``_parse_fasm_to_canon_list``.
+        Canonicalised FASM lines from ``_parse_fasm_to_canon_list``.
     spec_dict : dict
-        Bitstream specification dictionary.  Must contain ``TileMap``,
-        ``TileSpecs``, and ``TileSpecs_No_Mask``.
+        Must contain ``TileMap``, ``TileSpecs``, and ``TileSpecs_No_Mask``.
     tile_bits : dict[str, list[int]]
-        Per-tile bit array for the masked bitstream, mutated in place.
+        Masked per-tile bit array, mutated in place.
     tile_bits_no_mask : dict[str, list[int]]
-        Per-tile bit array for the unmasked HDL bitstream, mutated in place.
+        Unmasked per-tile bit array, mutated in place.
 
     Raises
     ------
     SpecMissMatch
-        If a feature's tile location is not present in ``TileMap``, or if
-        the feature name is not found in ``TileSpecs`` for that tile.
+        If a tile location or feature name is missing from the spec.
     """
     # Track which bit indices have already been written for each tile so that
     # overwrites are detected regardless of the bit value (a feature can
@@ -336,28 +307,22 @@ def _apply_fasm_features(
 
 
 def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
-    """Compute grid dimensions from tile coordinate keys.
-
-    Scans all keys in ``tile_bits`` (expected to follow the ``XnYm`` naming
-    convention) and returns the number of distinct columns and rows in the
-    grid.  The counts are one-based, so a tile at ``X3Y2`` contributes to a
-    grid of at least 4 columns and 3 rows.
+    """Compute grid dimensions from XnYm tile keys (one-based counts).
 
     Parameters
     ----------
     tile_bits : dict[str, list[int]]
-        Per-tile bit arrays whose keys are tile location strings (e.g.
-        ``'X0Y1'``, ``'X2Y3'``).
+        Per-tile bit arrays keyed by tile location strings (e.g. ``'X0Y1'``).
 
     Returns
     -------
     tuple[int, int]
-        ``(num_columns, num_rows)`` — the total width and height of the grid.
+        ``(num_columns, num_rows)``.
 
     Raises
     ------
     ValueError
-        If any tile key does not match the ``XnYm`` coordinate format.
+        If any tile key does not match the ``XnYm`` format.
     """
     num_columns = 0
     num_rows = 0
@@ -379,29 +344,22 @@ def _build_hdl_strings(
 ) -> tuple[str, str]:
     """Build Verilog (.vh) and VHDL (.vhd) emulation bitstream constant strings.
 
-    Produces one `` `define`` macro per non-NULL tile for Verilog and one
-    ``constant`` declaration per non-NULL tile for VHDL.  Tiles whose type is
-    ``'NULL'`` or whose ``FrameMap`` entry is empty are skipped.  The bit
-    vector is written in descending index order (MSB first) as required by
-    both HDL formats.
+    One define/constant per non-NULL tile; bit vector in descending index order
+    (MSB first) as required by both HDL formats.
 
     Parameters
     ----------
     tile_bits_no_mask : dict[str, list[int]]
-        Unmasked per-tile bit arrays (as produced by ``_apply_fasm_features``
-        into the ``tile_bits_no_mask`` structure).
+        Unmasked per-tile bit arrays.
     spec_dict : dict
-        Bitstream specification dictionary.  Must contain ``TileMap`` and
-        ``FrameMap``.
+        Must contain ``TileMap`` and ``FrameMap``.
     bitstream_format : BitstreamFormat
-        Resolved wire-format settings supplying frame dimensions and the
-        ``include_border_rows`` flag.
+        Supplies frame dimensions and ``include_border_rows``.
 
     Returns
     -------
     tuple[str, str]
-        ``(verilog_str, vhdl_str)`` — the complete Verilog header file content
-        and the complete VHDL package file content, respectively.
+        ``(verilog_str, vhdl_str)``.
     """
     total_bits = (
         bitstream_format.max_frames_per_col * bitstream_format.frame_bits_per_row
@@ -442,36 +400,33 @@ def _build_csv_and_frame_data(
     num_columns: int,
     bitstream_format: BitstreamFormat,
 ) -> tuple[str, list[list[bytes]]]:
-    """Build the CSV output string and the per-column frame byte arrays.
+    """Build the CSV output string and per-column frame byte arrays.
 
-    Iterates over interior rows only (rows 1 through ``num_rows - 2``
-    inclusive, in descending order) because the top and bottom rows carry no
-    bitstream content (hardcoded convention throughout FABulous).  For each
-    tile it appends a header line followed by one line per frame, and packs
-    the frame bits into the ``bit_array`` used later to assemble the binary
-    bitstream.
+    Border rows (top/bottom) are excluded by default per FABulous convention.
 
     Parameters
     ----------
     tile_bits : dict[str, list[int]]
-        Masked per-tile bit arrays (after feature application).
+        Masked per-tile bit arrays.
     spec_dict : dict
-        Bitstream specification dictionary.  Must contain ``ArchSpecs``
-        (``FrameBitsPerRow``, ``MaxFramesPerCol``) and ``TileMap``.
+        Must contain ``TileMap``.
     num_rows : int
-        Total number of rows in the grid (from ``_compute_grid_size``).
+        Total row count from ``_compute_grid_size``.
     num_columns : int
-        Total number of columns in the grid (from ``_compute_grid_size``).
+        Total column count from ``_compute_grid_size``.
     bitstream_format : BitstreamFormat
-        Resolved wire-format settings supplying frame dimensions and the
-        ``include_border_rows`` flag.
+        Supplies frame dimensions and ``include_border_rows``.
 
     Returns
     -------
     tuple[str, list[list[bytes]]]
-        ``(csv_str, bit_array)`` where ``csv_str`` is the full CSV text and
-        ``bit_array[col][frame]`` holds the packed bytes for that
-        column/frame combination, ready for binary assembly.
+        ``(csv_str, bit_array)`` where ``bit_array[col][frame]``
+        holds the packed bytes for binary assembly.
+
+    Raises
+    ------
+    SpecMissMatch
+        If a non-NULL tile key is missing from the initialized tile bits.
     """
     csv_str = ""
     bit_array = [
@@ -530,30 +485,21 @@ def _build_binary_bitstream(
     num_columns: int,
     bitstream_format: BitstreamFormat,
 ) -> bytes:
-    """Assemble the final binary bitstream from per-column frame data.
-
-    Prepends the 20-byte FABulous sync header, then for every column and
-    each frame present in ``bit_array[col]`` emits a 32-bit frame-select
-    word followed by the frame's data bytes. The frame-select word places
-    the column index in the top ``FRAME_SELECT_WIDTH`` bits and sets bit
-    ``frame_idx`` (one-hot) to identify the active frame.
-    Finally appends the desync frame with bit ``DESYNC_BIT`` set.
+    """Assemble binary bitstream: sync header + frame-select/data pairs + desync frame.
 
     Parameters
     ----------
     bit_array : list[list[bytes]]
-        ``bit_array[col][frame]`` — packed frame bytes as produced by
-        ``_build_csv_and_frame_data``.
+        Packed frame bytes indexed as ``bit_array[col][frame]``.
     num_columns : int
         Total number of columns in the grid.
     bitstream_format : BitstreamFormat
-        Typed wire-format settings resolved from the bitstream specification.
+        Wire-format settings.
 
     Returns
     -------
     bytes
-        Complete binary bitstream including the sync header, all frame-select
-        words and frame data, and the trailing desync frame.
+        Complete binary bitstream.
     """
     # Add sync header at the start of the bitstream
     bitstream = bytes.fromhex(bitstream_format.sync_header_hex)
@@ -586,37 +532,23 @@ def _build_binary_bitstream(
 
 
 def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
-    """Generate the bitstream from the FASM file using the bitstream specification.
-
-    Orchestrates the full bitstream generation pipeline:
-
-    1. Parse the FASM file into a canonicalised feature list.
-    2. Load the bitstream specification from the pickle file.
-    3. Initialise per-tile bit arrays and apply FASM features to them.
-    4. Derive grid dimensions from the tile map.
-    5. Build HDL emulation strings (Verilog and VHDL).
-    6. Build the CSV representation and pack frame data.
-    7. Assemble the binary bitstream.
-    8. Write all four output files (.csv, .vh, .vhd, .bin).
+    """Generate bitstream outputs (.csv, .vh, .vhd, .bin) from a FASM file and spec.
 
     Parameters
     ----------
     fasm_file : str
-        Path to the FASM file containing the configuration features to apply.
+        Path to the FASM file.
     spec_file : str
-        Path to the pickle file containing the bitstream specification
-        (``TileMap``, ``TileSpecs``, ``FrameMap``, ``ArchSpecs``, etc.).
+        Path to the pickle spec file
+        (``TileMap``, ``TileSpecs``, ``FrameMap``, ``ArchSpecs``, …).
     bitstream_file : str
-        Base output path.  The extension is replaced to produce the four
-        output files: ``<base>.csv``, ``<base>.vh``, ``<base>.vhd``, and
-        ``<base>.bin`` (the binary bitstream).
+        Base output path; extension is replaced for each output format.
 
     Raises
     ------
     ValueError
-        If the resolved bitstream format is invalid (e.g. ``MaxFramesPerCol``
-        exceeds available non-column bits in ``FRAME_BITS_PER_ROW``, or the grid is wider than
-        ``FRAME_SELECT_WIDTH`` can address).
+        If the bitstream format is invalid or the grid exceeds
+        ``FRAME_SELECT_WIDTH`` capacity.
     """
     canon_list = _parse_fasm_to_canon_list(fasm_file)
     if not canon_list:
