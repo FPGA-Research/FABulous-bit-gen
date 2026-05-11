@@ -40,6 +40,7 @@ from fasm import (
     set_feature_to_str,
 )
 from loguru import logger
+from packaging.version import Version
 
 from fabulous_bit_gen.custom_exception import SpecMissMatch
 
@@ -64,11 +65,6 @@ and < FRAME_BITS_PER_ROW - FRAME_SELECT_WIDTH (outside column-index field).
 
 FABULOUS_VERSION: str = "1.0"
 """Default FABulous version string."""
-
-
-def _is_old_fabulous_version(version: str) -> bool:
-    """Return True for spec versions that used IOmux instead of I0mux."""
-    return version == "1.0" or version.startswith("2.0b")
 
 
 @dataclass(frozen=True)
@@ -265,7 +261,7 @@ def _apply_fasm_features(
         if (
             "I0mux" in feature_name
             and feature_name not in tile_spec
-            and _is_old_fabulous_version(bitstream_format.fabulous_version)
+            and Version(bitstream_format.fabulous_version) < Version("2.0")
         ):
             candidate = feature_name.replace("I0mux", "IOmux")
             if candidate in tile_spec:

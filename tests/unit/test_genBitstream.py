@@ -811,14 +811,15 @@ class TestGenBitstreamVersionCompat:
             "X0Y1.A.I0mux", self._spec_with_iomux("2.0b1"), temp_output_dir, mocker
         )
 
-    def test_i0mux_not_remapped_for_new_version(self, temp_output_dir, mocker) -> None:
-        """I0mux in FASM should NOT fall back to IOmux for new spec versions."""
-        from fabulous_bit_gen.custom_exception import SpecMissMatch
-
+    @pytest.mark.parametrize("version", ["2.0", "2.1", "3.0"])
+    def test_i0mux_not_remapped_for_new_version(
+        self, version, temp_output_dir, mocker
+    ) -> None:
+        """I0mux in FASM should NOT fall back to IOmux for versions >= 2.0."""
         with pytest.raises(SpecMissMatch):
             self._run(
                 "X0Y1.A.I0mux",
-                self._spec_with_iomux("2.1"),
+                self._spec_with_iomux(version),
                 temp_output_dir,
                 mocker,
             )
