@@ -65,6 +65,12 @@ and < FRAME_BITS_PER_ROW - FRAME_SELECT_WIDTH (outside column-index field).
 FABULOUS_VERSION: str = "1.0"
 """Default FABulous version string."""
 
+
+def _is_old_fabulous_version(version: str) -> bool:
+    """Return True for spec versions that used IOmux instead of I0mux."""
+    return version == "1.0" or version.startswith("2.0b")
+
+
 @dataclass(frozen=True)
 class BitstreamFormat:
     """Typed bitstream wire-format settings resolved from spec/defaults."""
@@ -198,6 +204,7 @@ def _apply_fasm_features(
     spec_dict: dict,
     tile_bits: dict[str, list[int]],
     tile_bits_no_mask: dict[str, list[int]],
+    bitstream_format: BitstreamFormat,
 ) -> None:
     """Apply FASM features to tile bit arrays in place. Skips CLK features.
 
@@ -211,6 +218,8 @@ def _apply_fasm_features(
         Masked per-tile bit array, mutated in place.
     tile_bits_no_mask : dict[str, list[int]]
         Unmasked per-tile bit array, mutated in place.
+    bitstream_format : BitstreamFormat
+        Resolved format settings; version is used to apply compatibility fixes.
 
     Raises
     ------
@@ -250,11 +259,25 @@ def _apply_fasm_features(
 
         if tile_loc not in spec_dict["TileSpecs"]:
             raise SpecMissMatch(f"Tile location '{tile_loc}' not found in TileSpecs")
-        if feature_name in spec_dict["TileSpecs"][tile_loc]:
-            if spec_dict["TileSpecs"][tile_loc][feature_name]:
-                for bit_idx, bit_val in spec_dict["TileSpecs"][tile_loc][
-                    feature_name
-                ].items():
+
+        tile_spec = spec_dict["TileSpecs"][tile_loc]
+        spec_feature_name = feature_name
+        if (
+            "I0mux" in feature_name
+            and feature_name not in tile_spec
+            and _is_old_fabulous_version(bitstream_format.fabulous_version)
+        ):
+            candidate = feature_name.replace("I0mux", "IOmux")
+            if candidate in tile_spec:
+                logger.debug(
+                    f"Remapping feature '{feature_name}' → '{candidate}' "
+                    f"(spec version {bitstream_format.fabulous_version!r})"
+                )
+                spec_feature_name = candidate
+
+        if spec_feature_name in tile_spec:
+            if tile_spec[spec_feature_name]:
+                for bit_idx, bit_val in tile_spec[spec_feature_name].items():
                     new_val = int(bit_val)
                     if bit_idx in touched_bits[tile_loc]:
                         logger.warning(
@@ -269,14 +292,13 @@ def _apply_fasm_features(
                     raise SpecMissMatch(
                         f"Tile location '{tile_loc}' not found in TileSpecs_No_Mask"
                     )
-                if feature_name not in spec_dict["TileSpecs_No_Mask"][tile_loc]:
+                no_mask_spec = spec_dict["TileSpecs_No_Mask"][tile_loc]
+                if spec_feature_name not in no_mask_spec:
                     raise SpecMissMatch(
                         f"Feature '{feature_name}' of tile '{tile_loc}' missing "
                         "from TileSpecs_No_Mask"
                     )
-                for bit_idx, bit_val in spec_dict["TileSpecs_No_Mask"][tile_loc][
-                    feature_name
-                ].items():
+                for bit_idx, bit_val in no_mask_spec[spec_feature_name].items():
                     new_val = int(bit_val)
                     if bit_idx in touched_bits_no_mask[tile_loc]:
                         logger.warning(
@@ -552,7 +574,9 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
 
     bitstream_format = _resolve_bitstream_format(spec_dict)
     tile_bits, tile_bits_no_mask = _init_tile_bits(spec_dict, bitstream_format)
-    _apply_fasm_features(canon_list, spec_dict, tile_bits, tile_bits_no_mask)
+    _apply_fasm_features(
+        canon_list, spec_dict, tile_bits, tile_bits_no_mask, bitstream_format
+    )
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
     max_addressable_columns = 2**bitstream_format.frame_select_width

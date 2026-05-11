@@ -740,6 +740,99 @@ class TestGenBitstreamFasmProcessing:
         mock_logger.warning.assert_not_called()
 
 
+class TestGenBitstreamVersionCompat:
+    """Tests for version-dependent compatibility fixes."""
+
+    def _spec_with_iomux(self, version: str) -> dict:
+        """Spec using old IOmux naming (capital-O) for the given version.
+
+        FASM feature 'X0Y1.A.I0mux' → feature_name 'A.I0mux'; old spec stores 'A.IOmux'.
+        """
+        return {
+            "FABulousVersion": version,
+            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
+            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
+            "TileSpecs": {
+                "X0Y0": {},
+                "X0Y1": {"A.IOmux": {10: "1"}},
+                "X0Y2": {},
+            },
+            "TileSpecs_No_Mask": {
+                "X0Y0": {},
+                "X0Y1": {"A.IOmux": {10: "1"}},
+                "X0Y2": {},
+            },
+            "FrameMap": {
+                "NULL": {},
+                "W_IO": {0: "11111111111111111111111111111111"},
+            },
+            "FrameMapEncode": {},
+        }
+
+    def _run(self, feature: str, spec_dict: dict, temp_output_dir, mocker):
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+        fasm_lines = [
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature=feature, start=None, end=None, value=1, value_format=None
+                ),
+                annotations=None,
+                comment=None,
+            )
+        ]
+        with spec_file.open("wb") as f:
+            pickle.dump(spec_dict, f)
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="x")
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
+            side_effect=lambda f: f.feature,
+        )
+        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+
+    def test_i0mux_remapped_to_iomux_for_version_1_0(
+        self, temp_output_dir, mocker
+    ) -> None:
+        """I0mux in FASM should match IOmux in spec for FABulousVersion 1.0."""
+        self._run("X0Y1.A.I0mux", self._spec_with_iomux("1.0"), temp_output_dir, mocker)
+
+    def test_i0mux_remapped_to_iomux_for_version_2_0b(
+        self, temp_output_dir, mocker
+    ) -> None:
+        """I0mux in FASM should match IOmux in spec for FABulousVersion 2.0b1."""
+        self._run(
+            "X0Y1.A.I0mux", self._spec_with_iomux("2.0b1"), temp_output_dir, mocker
+        )
+
+    def test_i0mux_not_remapped_for_new_version(self, temp_output_dir, mocker) -> None:
+        """I0mux in FASM should NOT fall back to IOmux for new spec versions."""
+        from fabulous_bit_gen.custom_exception import SpecMissMatch
+
+        with pytest.raises(SpecMissMatch):
+            self._run(
+                "X0Y1.A.I0mux",
+                self._spec_with_iomux("2.1"),
+                temp_output_dir,
+                mocker,
+            )
+
+    def test_i0mux_used_directly_when_present_in_spec(
+        self, temp_output_dir, mocker
+    ) -> None:
+        """If spec already has I0mux, use it directly without remapping."""
+        spec = self._spec_with_iomux("1.0")
+        spec["TileSpecs"]["X0Y1"] = {"A.I0mux": {10: "1"}}
+        spec["TileSpecs_No_Mask"]["X0Y1"] = {"A.I0mux": {10: "1"}}
+        self._run("X0Y1.A.I0mux", spec, temp_output_dir, mocker)
+
+
 class TestGenBitstreamErrorHandling:
     """Tests for error handling in genBitstream."""
 
