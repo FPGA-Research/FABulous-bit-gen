@@ -797,18 +797,13 @@ class TestGenBitstreamVersionCompat:
         )
         genBitstream(str(fasm_file), str(spec_file), str(output_file))
 
-    def test_i0mux_remapped_to_iomux_for_version_1_0(
-        self, temp_output_dir, mocker
+    @pytest.mark.parametrize("version", ["1.0", "2.0b", "2.0b1"])
+    def test_i0mux_remapped_to_iomux_for_old_version(
+        self, version, temp_output_dir, mocker
     ) -> None:
-        """I0mux in FASM should match IOmux in spec for FABulousVersion 1.0."""
-        self._run("X0Y1.A.I0mux", self._spec_with_iomux("1.0"), temp_output_dir, mocker)
-
-    def test_i0mux_remapped_to_iomux_for_version_2_0b(
-        self, temp_output_dir, mocker
-    ) -> None:
-        """I0mux in FASM should match IOmux in spec for FABulousVersion 2.0b1."""
+        """I0mux in FASM should match IOmux in spec for old FABulousVersions."""
         self._run(
-            "X0Y1.A.I0mux", self._spec_with_iomux("2.0b1"), temp_output_dir, mocker
+            "X0Y1.A.I0mux", self._spec_with_iomux(version), temp_output_dir, mocker
         )
 
     @pytest.mark.parametrize("version", ["2.0", "2.1", "3.0"])
