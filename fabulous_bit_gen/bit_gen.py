@@ -41,20 +41,16 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from fasm import (
+    FasmLine,
+    fasm_tuple_to_string,
+    parse_fasm_filename,
+    parse_fasm_string,
+    set_feature_to_str,
+)
 from loguru import logger
 
 from fabulous_bit_gen.custom_exception import SpecMissMatch
-
-try:
-    from fasm import (
-        FasmLine,
-        fasm_tuple_to_string,
-        parse_fasm_filename,
-        parse_fasm_string,
-        set_feature_to_str,
-    )
-except ImportError:
-    logger.critical("Could not import fasm. Bitstream generation not supported.")
 
 # Bitstream format constants defaults
 FRAME_BITS_PER_ROW: int = 32
