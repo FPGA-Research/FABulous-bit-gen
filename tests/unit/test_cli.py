@@ -45,26 +45,50 @@ class TestBitGenCLI:
         assert exc_info.value.code == 0
 
     @pytest.mark.parametrize(
-        "argv,expected_args",
+        ("argv", "expected_args"),
         [
             (
                 ["bit_gen", "genBitstream", "test.fasm", "spec.bin", "output.bin"],
                 ("test.fasm", "spec.bin", "output.bin"),
             ),
             (
-                ["bit_gen", "genBitstream", "test-file_v1.fasm", "spec_file.bin", "out_v2.bin"],
+                [
+                    "bit_gen",
+                    "genBitstream",
+                    "test-file_v1.fasm",
+                    "spec_file.bin",
+                    "out_v2.bin",
+                ],
                 ("test-file_v1.fasm", "spec_file.bin", "out_v2.bin"),
             ),
             (
-                ["bit_gen", "genBitstream", "test.v1.fasm", "spec.v2.bin", "out.v3.bin"],
+                [
+                    "bit_gen",
+                    "genBitstream",
+                    "test.v1.fasm",
+                    "spec.v2.bin",
+                    "out.v3.bin",
+                ],
                 ("test.v1.fasm", "spec.v2.bin", "out.v3.bin"),
             ),
             (
-                ["/usr/local/bin/bit_gen", "genBitstream", "test.fasm", "spec.bin", "output.bin"],
+                [
+                    "/usr/local/bin/bit_gen",
+                    "genBitstream",
+                    "test.fasm",
+                    "spec.bin",
+                    "output.bin",
+                ],
                 ("test.fasm", "spec.bin", "output.bin"),
             ),
             (
-                ["bit_gen", "genBitstream", "a" * 255 + ".fasm", "spec.bin", "output.bin"],
+                [
+                    "bit_gen",
+                    "genBitstream",
+                    "a" * 255 + ".fasm",
+                    "spec.bin",
+                    "output.bin",
+                ],
                 ("a" * 255 + ".fasm", "spec.bin", "output.bin"),
             ),
             (
