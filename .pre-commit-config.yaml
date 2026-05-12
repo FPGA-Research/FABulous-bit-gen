@@ -1,7 +1,11 @@
-files: ^(FABulous)|(docs)/
+files: ^(fabulous_bit_gen|tests|docs)/
 default_language_version:
   python: python3.12
 repos:
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.11.13
+    hooks:
+      - id: uv-lock
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -45,4 +49,4 @@ repos:
     hooks:
       - id: pydoclint
         args: [--style=numpy]
-        exclude: ^(tests/|FABulous/FABulous_CLI/FABulous_CLI\.py$)
+        exclude: ^tests/
