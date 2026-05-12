@@ -593,6 +593,7 @@ def gen_bitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         f.write(bitstream_bytes)
 
 
+# Keep backwards-compatible function name
 genBitstream = gen_bitstream
 
 

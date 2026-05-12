@@ -4,7 +4,7 @@ import pickle
 
 import pytest
 
-from fabulous_bit_gen.bit_gen import genBitstream
+from fabulous_bit_gen.bit_gen import gen_bitstream
 
 
 class TestFullBitstreamIntegration:
@@ -23,7 +23,7 @@ class TestFullBitstreamIntegration:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -42,7 +42,7 @@ class TestFullBitstreamIntegration:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -64,7 +64,7 @@ class TestFullBitstreamIntegration:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -89,7 +89,7 @@ class TestFullBitstreamIntegration:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -113,7 +113,7 @@ class TestFullBitstreamIntegration:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -145,7 +145,7 @@ class TestFullBitstreamIntegrationFaultCases:
 
         fasm_file.write_text("")
 
-        genBitstream(
+        gen_bitstream(
             str(fasm_file), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -169,7 +169,7 @@ class TestFullBitstreamIntegrationFaultCases:
 
         fasm_file.write_text("# This is a comment\n# Another comment\n")
 
-        genBitstream(
+        gen_bitstream(
             str(fasm_file), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -183,7 +183,7 @@ class TestFullBitstreamIntegrationFaultCases:
         output_base = temp_output_dir / "output"
 
         with pytest.raises(FileNotFoundError):
-            genBitstream(
+            gen_bitstream(
                 str(fasm_file),
                 str(spec_file),
                 str(output_base.with_suffix(".bin")),
@@ -199,7 +199,7 @@ class TestFullBitstreamIntegrationFaultCases:
             pickle.dump(real_spec_dict, f)
 
         with pytest.raises(FileNotFoundError):
-            genBitstream(
+            gen_bitstream(
                 str(fasm_file), str(spec_file), str(output_base.with_suffix(".bin"))
             )
 
@@ -219,7 +219,7 @@ class TestFullBitstreamIntegrationFaultCases:
         fasm_file.write_text("X999Y999.SOME.FEATURE = 1\n")
 
         with pytest.raises(SpecMissMatch):
-            genBitstream(
+            gen_bitstream(
                 str(fasm_file), str(spec_file), str(output_base.with_suffix(".bin"))
             )
 
@@ -243,7 +243,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         output_base.with_suffix(".bin").write_bytes(b"old content")
         output_base.with_suffix(".csv").write_text("old content")
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -259,7 +259,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -277,7 +277,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -297,7 +297,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -317,7 +317,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -340,10 +340,10 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base1.with_suffix(".bin"))
         )
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base2.with_suffix(".bin"))
         )
 
@@ -362,7 +362,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -382,7 +382,7 @@ class TestFullBitstreamIntegrationEdgeCases:
         with spec_file.open("wb") as f:
             pickle.dump(real_spec_dict, f)
 
-        genBitstream(
+        gen_bitstream(
             str(design.fasm_path), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -448,7 +448,7 @@ class TestRegressionSensitivity:
             pickle.dump(real_spec_dict, f)
         empty_fasm.write_text("")
 
-        genBitstream(
+        gen_bitstream(
             str(empty_fasm), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 
@@ -469,7 +469,7 @@ class TestRegressionSensitivity:
             pickle.dump(real_spec_dict, f)
         empty_fasm.write_text("")
 
-        genBitstream(
+        gen_bitstream(
             str(empty_fasm), str(spec_file), str(output_base.with_suffix(".bin"))
         )
 

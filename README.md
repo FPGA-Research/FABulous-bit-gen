@@ -33,9 +33,9 @@ bit_gen -genBitstream input.fasm spec.pkl output.bin
 ### Python API
 
 ```python
-from fabulous_bit_gen import genBitstream
+from fabulous_bit_gen import gen_bitstream
 
-genBitstream("input.fasm", "spec.pkl", "output.bin")
+gen_bitstream("input.fasm", "spec.pkl", "output.bin")
 ```
 
 ## License

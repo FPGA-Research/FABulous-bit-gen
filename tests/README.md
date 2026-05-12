@@ -6,9 +6,9 @@ tests/
   unit/                     fast, isolated tests against synthetic data
     test_bit_gen_utility.py   bitstring_to_bytes and other helpers
     test_cli.py               argparse / CLI entry point
-    test_genBitstream.py      genBitstream pipeline, ~23 test classes
+    test_genBitstream.py      gen_bitstream pipeline, ~23 test classes
   integration/              slow, end-to-end tests against real designs
-    test_full_bitstream.py    runs genBitstream and checks output files
+    test_full_bitstream.py    runs gen_bitstream and checks output files
   test_data/                reference inputs and golden outputs
     bitStreamSpec.bin         FABulous fabric spec (shared by all designs)
     bitStreamSpec.csv         same spec in CSV form
@@ -47,7 +47,7 @@ e.g. `test_bitstream_output_matches_expected[sequential_16bit_en]`.
 
 For each run the test:
 1. Writes the shared `bitStreamSpec.bin` spec into a temporary directory.
-2. Calls `genBitstream(design.fasm_path, spec_file, output_base)`.
+2. Calls `gen_bitstream(design.fasm_path, spec_file, output_base)`.
 3. Compares the generated files against the corresponding files in
    `tests/test_data/<design>/reference/`.
 
