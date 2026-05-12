@@ -514,7 +514,7 @@ def _build_binary_bitstream(
     return bitstream
 
 
-def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
+def gen_bitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     """Generate bitstream outputs (.csv, .vh, .vhd, .bin) from a FASM file and spec.
 
     Parameters
@@ -593,6 +593,9 @@ def genBitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
         f.write(bitstream_bytes)
 
 
+genBitstream = gen_bitstream
+
+
 def bit_gen() -> None:
     """Command-line entry point for bitstream generation."""
     parser = argparse.ArgumentParser(
@@ -612,7 +615,7 @@ def bit_gen() -> None:
     args = parser.parse_args()
 
     if args.command == "genBitstream":
-        genBitstream(args.fasm_file, args.spec_file, args.output_file)
+        gen_bitstream(args.fasm_file, args.spec_file, args.output_file)
     else:
         parser.print_help()
 

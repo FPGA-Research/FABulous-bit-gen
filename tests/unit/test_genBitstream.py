@@ -1,8 +1,8 @@
 """Tests for genBitstream function with comprehensive mocking."""
 
+import copy
 import pickle
 import re
-from pathlib import Path
 
 import pytest
 from fasm import FasmLine, SetFasmFeature
@@ -14,7 +14,7 @@ from fabulous_bit_gen.bit_gen import (
     MAX_FRAMES_PER_COL,
     SYNC_HEADER_HEX,
     _resolve_bitstream_format,
-    genBitstream,
+    gen_bitstream,
 )
 from fabulous_bit_gen.custom_exception import SpecMissMatch
 
@@ -38,7 +38,7 @@ class TestGenBitstreamInitialization:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.with_suffix(".csv").exists()
 
@@ -58,7 +58,7 @@ class TestGenBitstreamInitialization:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -144,7 +144,7 @@ class TestGenBitstreamFasmProcessing:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
         # Valid feature was processed; CLK feature filtered
@@ -194,7 +194,7 @@ class TestGenBitstreamFasmProcessing:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         assert csv_path.exists()
@@ -255,7 +255,7 @@ class TestGenBitstreamFasmProcessing:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -315,7 +315,7 @@ class TestGenBitstreamFasmProcessing:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -368,7 +368,7 @@ class TestGenBitstreamFasmProcessing:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         assert csv_path.exists()
@@ -419,7 +419,7 @@ class TestGenBitstreamFasmProcessing:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         assert csv_path.exists()
@@ -440,7 +440,7 @@ class TestGenBitstreamFasmProcessing:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
         mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -448,36 +448,19 @@ class TestGenBitstreamFasmProcessing:
         warning_messages = [call[0][0] for call in mock_logger.warning.call_args_list]
         assert any("no features" in msg for msg in warning_messages)
 
-    def _overlapping_spec(self):
-        """Shared spec for overwrite-warning tests.
-
-        FEAT.A and FEAT.B both map to bit 50.
-        """
-        return {
-            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
-            "TileSpecs": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "1"},
-                    "FEAT.B": {50: "1"},
-                },
-                "X0Y2": {},
-            },
-            "TileSpecs_No_Mask": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "1"},
-                    "FEAT.B": {50: "1"},
-                },
-                "X0Y2": {},
-            },
-            "FrameMap": {
-                "NULL": {},
-                "W_IO": {0: "11111111111111111111111111111111"},
-            },
-            "FrameMapEncode": {},
-        }
+    def _spec_with_x0y1_features(
+        self,
+        base: dict,
+        tile_specs: dict,
+        tile_specs_no_mask: dict | None = None,
+    ) -> dict:
+        """Return a deep copy of base with X0Y1 TileSpecs overridden."""
+        spec = copy.deepcopy(base)
+        spec["TileSpecs"]["X0Y1"] = tile_specs
+        spec["TileSpecs_No_Mask"]["X0Y1"] = (
+            tile_specs_no_mask if tile_specs_no_mask is not None else tile_specs
+        )
+        return spec
 
     def _run_with_features(self, features, spec_dict, temp_output_dir, mocker):
         """Run genBitstream with a given list of feature strings.
@@ -521,10 +504,12 @@ class TestGenBitstreamFasmProcessing:
         )
         mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
         return mock_logger
 
-    def test_overlapping_features_emit_warning(self, temp_output_dir, mocker) -> None:
+    def test_overlapping_features_emit_warning(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ) -> None:
         """Two features mapping to the same bit index should trigger a logger warning.
 
         Both TileSpecs (masked) and TileSpecs_No_Mask (unmasked) overlap at bit 50, so
@@ -532,7 +517,9 @@ class TestGenBitstreamFasmProcessing:
         """
         mock_logger = self._run_with_features(
             ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
-            self._overlapping_spec(),
+            self._spec_with_x0y1_features(
+                minimal_spec_dict, {"FEAT.A": {50: "1"}, "FEAT.B": {50: "1"}}
+            ),
             temp_output_dir,
             mocker,
         )
@@ -545,6 +532,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_overlapping_zero_valued_bit_emits_warning(
         self,
+        minimal_spec_dict,
         temp_output_dir,
         mocker,
     ) -> None:
@@ -555,35 +543,15 @@ class TestGenBitstreamFasmProcessing:
         tracker must detect it regardless of the stored value. Both TileSpecs and
         TileSpecs_No_Mask overlap, so two warnings are expected.
         """
-        spec_dict = {
-            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
-            "TileSpecs": {
-                "X0Y0": {},
-                "X0Y1": {
+        mock_logger = self._run_with_features(
+            ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
+            self._spec_with_x0y1_features(
+                minimal_spec_dict,
+                {
                     "FEAT.A": {50: "0"},  # explicitly writes 0 to bit 50
                     "FEAT.B": {50: "1"},  # then overwrites bit 50 with 1
                 },
-                "X0Y2": {},
-            },
-            "TileSpecs_No_Mask": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "0"},
-                    "FEAT.B": {50: "1"},
-                },
-                "X0Y2": {},
-            },
-            "FrameMap": {
-                "NULL": {},
-                "W_IO": {0: "11111111111111111111111111111111"},
-            },
-            "FrameMapEncode": {},
-        }
-
-        mock_logger = self._run_with_features(
-            ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
-            spec_dict,
+            ),
             temp_output_dir,
             mocker,
         )
@@ -596,6 +564,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_no_mask_only_overlap_emits_one_warning(
         self,
+        minimal_spec_dict,
         temp_output_dir,
         mocker,
     ) -> None:
@@ -605,35 +574,13 @@ class TestGenBitstreamFasmProcessing:
         fires.  TileSpecs_No_Mask maps both features to bit 50, which triggers the
         unmasked overwrite warning.
         """
-        spec_dict = {
-            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
-            "TileSpecs": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "1"},  # masked: distinct bits, no conflict
-                    "FEAT.B": {51: "1"},
-                },
-                "X0Y2": {},
-            },
-            "TileSpecs_No_Mask": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "1"},  # unmasked: both write to bit 50
-                    "FEAT.B": {50: "1"},
-                },
-                "X0Y2": {},
-            },
-            "FrameMap": {
-                "NULL": {},
-                "W_IO": {0: "11111111111111111111111111111111"},
-            },
-            "FrameMapEncode": {},
-        }
-
         mock_logger = self._run_with_features(
             ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
-            spec_dict,
+            self._spec_with_x0y1_features(
+                minimal_spec_dict,
+                {"FEAT.A": {50: "1"}, "FEAT.B": {51: "1"}},  # masked: distinct bits
+                {"FEAT.A": {50: "1"}, "FEAT.B": {50: "1"}},  # unmasked: both bit 50
+            ),
             temp_output_dir,
             mocker,
         )
@@ -646,6 +593,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_masked_only_overlap_emits_one_warning(
         self,
+        minimal_spec_dict,
         temp_output_dir,
         mocker,
     ) -> None:
@@ -655,35 +603,13 @@ class TestGenBitstreamFasmProcessing:
         fires.  TileSpecs maps both features to bit 50, triggering the masked overwrite
         warning.
         """
-        spec_dict = {
-            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
-            "TileSpecs": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "1"},  # masked: both write to bit 50
-                    "FEAT.B": {50: "1"},
-                },
-                "X0Y2": {},
-            },
-            "TileSpecs_No_Mask": {
-                "X0Y0": {},
-                "X0Y1": {
-                    "FEAT.A": {50: "1"},  # unmasked: distinct bits, no conflict
-                    "FEAT.B": {51: "1"},
-                },
-                "X0Y2": {},
-            },
-            "FrameMap": {
-                "NULL": {},
-                "W_IO": {0: "11111111111111111111111111111111"},
-            },
-            "FrameMapEncode": {},
-        }
-
         mock_logger = self._run_with_features(
             ["X0Y1.FEAT.A", "X0Y1.FEAT.B"],
-            spec_dict,
+            self._spec_with_x0y1_features(
+                minimal_spec_dict,
+                {"FEAT.A": {50: "1"}, "FEAT.B": {50: "1"}},  # masked: both bit 50
+                {"FEAT.A": {50: "1"}, "FEAT.B": {51: "1"}},  # unmasked: distinct bits
+            ),
             temp_output_dir,
             mocker,
         )
@@ -696,6 +622,7 @@ class TestGenBitstreamFasmProcessing:
 
     def test_non_overlapping_features_emit_no_warning(
         self,
+        minimal_spec_dict,
         temp_output_dir,
         mocker,
     ) -> None:
@@ -703,36 +630,7 @@ class TestGenBitstreamFasmProcessing:
         warning."""
         mock_logger = self._run_with_features(
             ["X0Y1.W2MID7.A_I", "X0Y1.GND0.A_T"],
-            {
-                "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-                "TileMap": {
-                    "X0Y0": "NULL",
-                    "X0Y1": "W_IO",
-                    "X1Y1": "LUT4AB",
-                    "X0Y2": "NULL",
-                    "X1Y2": "NULL",
-                },
-                "TileSpecs": {
-                    "X0Y1": {"W2MID7.A_I": {110: "1", 111: "0"}, "GND0.A_T": {50: "1"}},
-                    "X1Y1": {},
-                    "X0Y0": {},
-                    "X0Y2": {},
-                    "X1Y2": {},
-                },
-                "TileSpecs_No_Mask": {
-                    "X0Y1": {"W2MID7.A_I": {110: "1", 111: "0"}, "GND0.A_T": {50: "1"}},
-                    "X1Y1": {},
-                    "X0Y0": {},
-                    "X0Y2": {},
-                    "X1Y2": {},
-                },
-                "FrameMap": {
-                    "NULL": {},
-                    "W_IO": {0: "11111111111111111111111111111111"},
-                    "LUT4AB": {0: "00000001111111111111111111111011"},
-                },
-                "FrameMapEncode": {},
-            },
+            minimal_spec_dict,
             temp_output_dir,
             mocker,
         )
@@ -743,31 +641,16 @@ class TestGenBitstreamFasmProcessing:
 class TestGenBitstreamVersionCompat:
     """Tests for version-dependent compatibility fixes."""
 
-    def _spec_with_iomux(self, version: str) -> dict:
+    def _spec_with_iomux(self, base: dict, version: str) -> dict:
         """Spec using old IOmux naming (capital-O) for the given version.
 
         FASM feature 'X0Y1.A.I0mux' → feature_name 'A.I0mux'; old spec stores 'A.IOmux'.
         """
-        return {
-            "FABulousVersion": version,
-            "ArchSpecs": {"MaxFramesPerCol": 20, "FrameBitsPerRow": 32},
-            "TileMap": {"X0Y0": "NULL", "X0Y1": "W_IO", "X0Y2": "NULL"},
-            "TileSpecs": {
-                "X0Y0": {},
-                "X0Y1": {"A.IOmux": {10: "1"}},
-                "X0Y2": {},
-            },
-            "TileSpecs_No_Mask": {
-                "X0Y0": {},
-                "X0Y1": {"A.IOmux": {10: "1"}},
-                "X0Y2": {},
-            },
-            "FrameMap": {
-                "NULL": {},
-                "W_IO": {0: "11111111111111111111111111111111"},
-            },
-            "FrameMapEncode": {},
-        }
+        spec = copy.deepcopy(base)
+        spec["FABulousVersion"] = version
+        spec["TileSpecs"]["X0Y1"] = {"A.IOmux": {10: "1"}}
+        spec["TileSpecs_No_Mask"]["X0Y1"] = {"A.IOmux": {10: "1"}}
+        return spec
 
     def _run(self, feature: str, spec_dict: dict, temp_output_dir, mocker):
         spec_file = temp_output_dir / "spec.bin"
@@ -795,35 +678,38 @@ class TestGenBitstreamVersionCompat:
             "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=lambda f: f.feature,
         )
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     @pytest.mark.parametrize("version", ["1.0", "2.0b", "2.0b1"])
     def test_i0mux_remapped_to_iomux_for_old_version(
-        self, version, temp_output_dir, mocker
+        self, version, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
         """I0mux in FASM should match IOmux in spec for old FABulousVersions."""
         self._run(
-            "X0Y1.A.I0mux", self._spec_with_iomux(version), temp_output_dir, mocker
+            "X0Y1.A.I0mux",
+            self._spec_with_iomux(minimal_spec_dict, version),
+            temp_output_dir,
+            mocker,
         )
 
     @pytest.mark.parametrize("version", ["2.0", "2.1", "3.0"])
     def test_i0mux_not_remapped_for_new_version(
-        self, version, temp_output_dir, mocker
+        self, version, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
         """I0mux in FASM should NOT fall back to IOmux for versions >= 2.0."""
         with pytest.raises(SpecMissMatch):
             self._run(
                 "X0Y1.A.I0mux",
-                self._spec_with_iomux(version),
+                self._spec_with_iomux(minimal_spec_dict, version),
                 temp_output_dir,
                 mocker,
             )
 
     def test_i0mux_used_directly_when_present_in_spec(
-        self, temp_output_dir, mocker
+        self, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
         """If spec already has I0mux, use it directly without remapping."""
-        spec = self._spec_with_iomux("1.0")
+        spec = self._spec_with_iomux(minimal_spec_dict, "1.0")
         spec["TileSpecs"]["X0Y1"] = {"A.I0mux": {10: "1"}}
         spec["TileSpecs_No_Mask"]["X0Y1"] = {"A.I0mux": {10: "1"}}
         self._run("X0Y1.A.I0mux", spec, temp_output_dir, mocker)
@@ -876,7 +762,7 @@ class TestGenBitstreamErrorHandling:
         )
 
         with pytest.raises(SpecMissMatch) as exc_info:
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert "X99Y99" in str(exc_info.value)
 
@@ -924,7 +810,7 @@ class TestGenBitstreamErrorHandling:
         )
 
         with pytest.raises(SpecMissMatch) as exc_info:
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert "UNKNOWN.FEATURE" in str(exc_info.value)
 
@@ -972,7 +858,7 @@ class TestGenBitstreamErrorHandling:
         )
 
         with pytest.raises(SpecMissMatch) as exc_info:
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         error_msg = str(exc_info.value)
         assert "X0Y1" in error_msg
@@ -995,7 +881,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(FileNotFoundError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_fasm_file_not_found(self, minimal_spec_dict, temp_output_dir) -> None:
         """Missing FASM file should raise FileNotFoundError."""
@@ -1007,7 +893,7 @@ class TestGenBitstreamFaultCases:
             pickle.dump(minimal_spec_dict, f)
 
         with pytest.raises(FileNotFoundError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_corrupted_pickle_spec_file(self, temp_output_dir, mocker) -> None:
         """Corrupted pickle file should raise pickle.UnpicklingError."""
@@ -1024,7 +910,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(pickle.UnpicklingError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_empty_spec_dict(self, temp_output_dir, mocker) -> None:
         """Empty spec dict should raise KeyError."""
@@ -1041,7 +927,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_archspecs(self, temp_output_dir, mocker) -> None:
         """Spec dict missing ArchSpecs should use default fallback values."""
@@ -1064,7 +950,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
         assert output_file.exists()
 
     def test_spec_dict_missing_tilemap(self, temp_output_dir, mocker) -> None:
@@ -1089,7 +975,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_tilespecs(self, temp_output_dir, mocker) -> None:
         """Spec dict missing TileSpecs should raise KeyError."""
@@ -1133,7 +1019,7 @@ class TestGenBitstreamFaultCases:
         )
 
         with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_spec_dict_missing_framemap(self, temp_output_dir, mocker) -> None:
         """Spec dict missing FrameMap should raise KeyError."""
@@ -1157,7 +1043,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(KeyError):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_archspecs_missing_maxframespercol(self, temp_output_dir, mocker) -> None:
         """ArchSpecs missing MaxFramesPerCol should use fallback value."""
@@ -1181,7 +1067,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
         assert output_file.exists()
 
     def test_archspecs_missing_framebitsperrow(self, temp_output_dir, mocker) -> None:
@@ -1206,7 +1092,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
         assert output_file.exists()
 
     def test_resolve_bitstream_format_warns_when_using_defaults(self, mocker) -> None:
@@ -1290,7 +1176,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(ValueError, match="columns.*FRAME_SELECT_WIDTH"):
-            genBitstream(
+            gen_bitstream(
                 str(temp_output_dir / "test.fasm"),
                 str(spec_file),
                 str(temp_output_dir / "output.bin"),
@@ -1340,7 +1226,7 @@ class TestGenBitstreamFaultCases:
         )
 
         with pytest.raises(SpecMissMatch, match="fewer than 3 dot-separated parts"):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
     def test_tile_coord_invalid_format(
         self, minimal_spec_dict, temp_output_dir, mocker
@@ -1363,7 +1249,7 @@ class TestGenBitstreamFaultCases:
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
         with pytest.raises(ValueError, match="XnYm format"):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
 
 class TestGenBitstreamEdgeCases:
@@ -1412,7 +1298,7 @@ class TestGenBitstreamEdgeCases:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
         # Extra part silently ignored; feature "W2MID7.A_I" resolved correctly
@@ -1461,7 +1347,7 @@ class TestGenBitstreamEdgeCases:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
         # CLK-substring feature filtered (would raise SpecMissMatch if not)
@@ -1491,7 +1377,7 @@ class TestGenBitstreamEdgeCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.exists()
 
@@ -1519,7 +1405,7 @@ class TestGenBitstreamEdgeCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
         assert output_file.exists()
 
     def test_single_column_grid(self, temp_output_dir, mocker) -> None:
@@ -1544,7 +1430,7 @@ class TestGenBitstreamEdgeCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.exists()
 
@@ -1598,7 +1484,7 @@ class TestGenBitstreamEdgeCases:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.exists()
 
@@ -1653,7 +1539,7 @@ class TestGenBitstreamEdgeCases:
             side_effect=mock_set_feature_to_str,
         )
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.exists()
 
@@ -1676,7 +1562,7 @@ class TestGenBitstreamEdgeCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(
+        gen_bitstream(
             str(temp_output_dir / "test.fasm"), str(spec_file), str(output_file)
         )
 
@@ -1687,10 +1573,10 @@ class TestGenBitstreamEdgeCases:
         minimal_spec_dict,
         temp_output_dir,
         mocker,
+        monkeypatch,
     ) -> None:
         """Relative output path should work."""
         spec_file = temp_output_dir / "spec.bin"
-        temp_output_dir / "output.bin"
 
         with spec_file.open("wb") as f:
             pickle.dump(minimal_spec_dict, f)
@@ -1699,13 +1585,10 @@ class TestGenBitstreamEdgeCases:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(temp_output_dir / "test.fasm"), str(spec_file), "output.bin")
+        monkeypatch.chdir(temp_output_dir)
+        gen_bitstream(str(temp_output_dir / "test.fasm"), str(spec_file), "output.bin")
 
-        assert Path("output.bin").exists()
-        Path("output.bin").unlink()
-        Path("output.csv").unlink()
-        Path("output.vh").unlink()
-        Path("output.vhd").unlink()
+        assert (temp_output_dir / "output.bin").exists()
 
 
 class TestGenBitstreamNullTileHandling:
@@ -1726,7 +1609,7 @@ class TestGenBitstreamNullTileHandling:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -1750,7 +1633,7 @@ class TestGenBitstreamNullTileHandling:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         vh_content = vh_path.read_text()
@@ -1790,7 +1673,7 @@ class TestGenBitstreamFrameMap:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         vh_content = vh_path.read_text()
@@ -1811,7 +1694,7 @@ class TestGenBitstreamFrameMap:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         vh_content = vh_path.read_text()
@@ -1835,7 +1718,7 @@ class TestGenBitstreamCsvOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         assert csv_path.exists()
@@ -1858,7 +1741,7 @@ class TestGenBitstreamCsvOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -1883,7 +1766,7 @@ class TestGenBitstreamCsvOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -1908,7 +1791,7 @@ class TestGenBitstreamCsvOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -1945,7 +1828,7 @@ class TestGenBitstreamVhdlOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vhd_path = output_file.with_suffix(".vhd")
         assert vhd_path.exists()
@@ -1968,7 +1851,7 @@ class TestGenBitstreamVhdlOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vhd_path = output_file.with_suffix(".vhd")
         vhd_content = vhd_path.read_text()
@@ -1994,7 +1877,7 @@ class TestGenBitstreamVhdlOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vhd_path = output_file.with_suffix(".vhd")
         vhd_content = vhd_path.read_text()
@@ -2024,7 +1907,7 @@ class TestGenBitstreamVerilogOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         assert vh_path.exists()
@@ -2047,7 +1930,7 @@ class TestGenBitstreamVerilogOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         vh_content = vh_path.read_text()
@@ -2070,7 +1953,7 @@ class TestGenBitstreamVerilogOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         vh_content = vh_path.read_text()
@@ -2126,7 +2009,7 @@ class TestGenBitstreamNoneSetFeature:
         )
 
         # Should not raise TypeError/AttributeError from set_feature_to_str(None)
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
         assert "X0Y1" in csv_content
@@ -2158,7 +2041,7 @@ class TestGenBitstreamNoneSetFeature:
         )
         mocker.patch("fabulous_bit_gen.bit_gen.set_feature_to_str")
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.with_suffix(".csv").exists()
 
@@ -2181,7 +2064,7 @@ class TestGenBitstreamCsvRowBoundaries:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
         tile_lines = [
@@ -2208,7 +2091,7 @@ class TestGenBitstreamCsvRowBoundaries:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_content = output_file.with_suffix(".csv").read_text()
         tile_lines = [
@@ -2287,7 +2170,7 @@ class TestGenBitstreamSpecInconsistency:
         )
 
         with pytest.raises(SpecMissMatch, match="TileSpecs_No_Mask"):
-            genBitstream(str(fasm_file), str(spec_file), str(output_file))
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
 
 class TestGenBitstreamBinaryOutput:
@@ -2311,7 +2194,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         assert output_file.exists()
 
@@ -2333,7 +2216,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         with output_file.open("rb") as f:
             header = f.read(20)
@@ -2356,7 +2239,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         with output_file.open("rb") as f:
             content = f.read()
@@ -2379,7 +2262,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         with output_file.open("rb") as f:
             content = f.read()
@@ -2404,7 +2287,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         with output_file.open("rb") as f:
             content = f.read()
@@ -2432,7 +2315,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         with output_file.open("rb") as f:
             content = f.read()
@@ -2466,7 +2349,7 @@ class TestGenBitstreamBinaryOutput:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         with output_file.open("rb") as f:
             content = f.read()
@@ -2499,7 +2382,7 @@ class TestGenBitstreamBitManipulation:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         csv_path = output_file.with_suffix(".csv")
         csv_content = csv_path.read_text()
@@ -2527,7 +2410,7 @@ class TestGenBitstreamBitManipulation:
         mocker.patch("fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="")
         mocker.patch("fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=[])
 
-        genBitstream(str(fasm_file), str(spec_file), str(output_file))
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
 
         vh_path = output_file.with_suffix(".vh")
         vh_content = vh_path.read_text()
