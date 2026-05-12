@@ -29,6 +29,7 @@ import argparse
 import math
 import pickle
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -599,19 +600,44 @@ genBitstream = gen_bitstream
 
 def bit_gen() -> None:
     """Command-line entry point for bitstream generation."""
+    # Backwards compat: old CLI used `-genBitstream` (flag style)
+    if len(sys.argv) > 1 and sys.argv[1] == "-genBitstream":
+        sys.argv[1] = "genBitstream"
+
     parser = argparse.ArgumentParser(
         prog="bit_gen",
         description="FABulous bitstream generation tool",
+        epilog=(
+            "Examples:\n"
+            "  bit_gen genBitstream design.fasm bitStreamSpec.bin out.bin\n"
+            "  bit_gen -genBitstream design.fasm bitStreamSpec.bin out.bin  "
+            "  # legacy form\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(dest="command")
 
     gen_parser = subparsers.add_parser(
         "genBitstream",
         help="Generate a bitstream from a FASM file and bitstream spec",
+        description=(
+            "Convert a FASM feature file and a FABulous bitstream spec (.bin) "
+            "into a binary bitstream ready for fabric configuration."
+        ),
+        epilog=(
+            "Example:\n"
+            "  bit_gen genBitstream build/design.fasm "
+            "../.FABulous/bitStreamSpec.bin build/design.bin\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    gen_parser.add_argument("fasm_file", help="Path to the FASM file")
-    gen_parser.add_argument("spec_file", help="Path to the bitstream spec file")
-    gen_parser.add_argument("output_file", help="Path to write the output bitstream")
+    gen_parser.add_argument("fasm_file", help="Path to the input FASM file")
+    gen_parser.add_argument(
+        "spec_file", help="Path to the FABulous bitstream spec (.bin)"
+    )
+    gen_parser.add_argument(
+        "output_file", help="Path to write the output bitstream (.bin)"
+    )
 
     args = parser.parse_args()
 

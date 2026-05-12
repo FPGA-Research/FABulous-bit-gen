@@ -104,6 +104,17 @@ class TestBitGenCLI:
         bit_gen()
         mock_gen.assert_called_once_with(*expected_args)
 
+    def test_legacy_flag_style_calls_gen_bitstream(self, mocker) -> None:
+        """Legacy -genBitstream flag (with dash) should work identically to the
+        subcommand."""
+        mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.gen_bitstream")
+        mocker.patch(
+            "sys.argv",
+            ["bit_gen", "-genBitstream", "test.fasm", "spec.bin", "output.bin"],
+        )
+        bit_gen()
+        mock_gen.assert_called_once_with("test.fasm", "spec.bin", "output.bin")
+
     def test_no_subcommand_does_not_call_gen_bitstream(self, mocker) -> None:
         """No subcommand should print help without calling gen_bitstream."""
         mock_gen = mocker.patch("fabulous_bit_gen.bit_gen.gen_bitstream")
