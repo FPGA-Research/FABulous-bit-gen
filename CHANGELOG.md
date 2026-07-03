@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/FPGA-Research/FABulous-bit-gen/compare/v0.3.0...v0.3.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **ci:** stop tagging rolling v0/v0.3 refs on release ([fd87ced](https://github.com/FPGA-Research/FABulous-bit-gen/commit/fd87ceded715f48cced6c31dddc3f469aab8cc2a))
+* **ci:** stop tagging rolling v0/v0.3 refs on release ([ca8f406](https://github.com/FPGA-Research/FABulous-bit-gen/commit/ca8f4066dc7c030b23023140dfd1cf0b7e5c2ee9))
+
 ## [0.3.0](https://github.com/FPGA-Research/FABulous-bit-gen/compare/v0.2.0...v0.3.0) (2026-05-12)
 
 
