@@ -31,6 +31,7 @@ import pickle
 import re
 import sys
 from dataclasses import dataclass
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
 from fasm import (
@@ -614,6 +615,12 @@ def bit_gen() -> None:
             "  # legacy form\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"bit_gen {_pkg_version('FABulous-bit-gen')}",
     )
     subparsers = parser.add_subparsers(dest="command")
 
