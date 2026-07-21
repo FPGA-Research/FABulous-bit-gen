@@ -151,6 +151,114 @@ class TestGenBitstreamFasmProcessing:
         # (would raise SpecMissMatch if not filtered)
         assert "X0Y1" in csv_content
 
+    def test_clk_feature_processed_with_multi_clk_domains(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
+        """With MultiClkDomains enabled, CLK features are applied, not skipped."""
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        spec = copy.deepcopy(minimal_spec_dict)
+        spec["ArchSpecs"]["MultiClkDomains"] = True
+        spec["TileSpecs"]["X0Y1"]["CLK.enable"] = {60: "1"}
+        spec["TileSpecs_No_Mask"]["X0Y1"]["CLK.enable"] = {60: "1"}
+
+        fasm_lines = [
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.CLK.enable",
+                    start=None,
+                    end=None,
+                    value=1,
+                    value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            ),
+        ]
+
+        with spec_file.open("wb") as f:
+            pickle.dump(spec, f)
+
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
+            side_effect=lambda feature: feature.feature,
+        )
+
+        # Bit 60 lives in frame 1 (60 // 32), reversed within its 32-bit row.
+        gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
+
+        csv_content = output_file.with_suffix(".csv").read_text()
+        # frame1 row for X0Y1: bit 60 -> index 28 within the frame, reversed.
+        frame1_line = next(
+            row
+            for row in csv_content.splitlines()
+            if row.startswith("frame1,") and "X0Y1" not in row
+        )
+        frame_bits = frame1_line.split(",")[-1]
+        assert frame_bits[::-1][28] == "1"
+
+    def test_clk_feature_missing_from_spec_raises_with_multi_clk(
+        self,
+        minimal_spec_dict,
+        temp_output_dir,
+        mocker,
+    ) -> None:
+        """MultiClkDomains stops filtering, so an unspecced CLK feature errors."""
+        spec_file = temp_output_dir / "spec.bin"
+        fasm_file = temp_output_dir / "test.fasm"
+        output_file = temp_output_dir / "output.bin"
+
+        spec = copy.deepcopy(minimal_spec_dict)
+        spec["ArchSpecs"]["MultiClkDomains"] = True
+
+        fasm_lines = [
+            FasmLine(
+                set_feature=SetFasmFeature(
+                    feature="X0Y1.CLK.enable",
+                    start=None,
+                    end=None,
+                    value=1,
+                    value_format=None,
+                ),
+                annotations=None,
+                comment=None,
+            ),
+        ]
+
+        with spec_file.open("wb") as f:
+            pickle.dump(spec, f)
+
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_filename", return_value=fasm_lines
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.fasm_tuple_to_string", return_value="canonical"
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.parse_fasm_string", return_value=fasm_lines
+        )
+        mocker.patch(
+            "fabulous_bit_gen.bit_gen.set_feature_to_str",
+            side_effect=lambda feature: feature.feature,
+        )
+
+        with pytest.raises(SpecMissMatch):
+            gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
+
     def test_valid_feature_sets_bits_in_tile(
         self, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
@@ -1106,7 +1214,8 @@ class TestGenBitstreamFaultCases:
         assert resolved.frame_select_width == FRAME_SELECT_WIDTH
         assert resolved.desync_bit == DESYNC_BIT
         assert resolved.fabulous_version == "1.0"
-        assert mock_logger.debug.call_count == 7
+        assert resolved.multi_clk_domains is False
+        assert mock_logger.debug.call_count == 8
 
     def test_resolve_format_uses_fabulous_version_from_spec(self, mocker) -> None:
         """FABulousVersion present in spec should be used as-is."""
@@ -1116,6 +1225,13 @@ class TestGenBitstreamFaultCases:
         )
 
         assert resolved.fabulous_version == "2.0"
+
+    def test_resolve_format_uses_multi_clk_domains_from_spec(self, mocker) -> None:
+        """MultiClkDomains present in spec should be used as-is."""
+        mocker.patch("fabulous_bit_gen.bit_gen.logger")
+        resolved = _resolve_bitstream_format({"MultiClkDomains": True, "ArchSpecs": {}})
+
+        assert resolved.multi_clk_domains is True
 
     def test_resolve_format_raises_when_max_frames_exceeds_select_bits(self) -> None:
         """MaxFramesPerCol exceeding selectable frame bits raises ValueError."""
