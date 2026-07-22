@@ -80,6 +80,7 @@ class BitstreamFormat:
     desync_bit: int
     include_border_rows: bool = False
     fabulous_version: str = "1.0"
+    multi_clk_domains: bool = False
 
 
 def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
@@ -103,6 +104,7 @@ def _resolve_bitstream_format(spec_dict: dict) -> BitstreamFormat:
         desync_bit=int(pick("DesyncBit", DESYNC_BIT)),
         include_border_rows=bool(pick("IncludeBorderRows", False)),
         fabulous_version=str(pick("FABulousVersion", FABULOUS_VERSION)),
+        multi_clk_domains=bool(pick("MultiClkDomains", False)),
     )
 
     if fmt.frame_select_width + 1 > fmt.frame_bits_per_row:
@@ -205,7 +207,7 @@ def _apply_fasm_features(
         if not line.set_feature:
             continue
         feature_str = set_feature_to_str(line.set_feature)
-        if "CLK" in feature_str:
+        if "CLK" in feature_str and not bitstream_format.multi_clk_domains:
             continue
 
         feature_parts = feature_str.split(".")
