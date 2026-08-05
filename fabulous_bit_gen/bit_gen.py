@@ -177,7 +177,7 @@ def _apply_fasm_features(
     tile_bits: dict[str, list[int]],
     tile_bits_no_mask: dict[str, list[int]],
     bitstream_format: BitstreamFormat,
-) -> None:
+) -> set[tuple[int, int]]:
     """Apply FASM features to tile bit arrays in place. Skips CLK features.
 
     Parameters
@@ -197,11 +197,19 @@ def _apply_fasm_features(
     ------
     SpecMissMatch
         If a tile location or feature name is missing from the spec.
+
+    Returns
+    -------
+    set[tuple[int, int]]
+        A set of (column, frame_index) pairs identifying the frames that received data.
     """
     # Track which bit indices have already been written for each tile so that
     # overwrites are detected regardless of the bit value.
     touched_bits: dict[str, set] = {tile: set() for tile in tile_bits}
     touched_bits_no_mask: dict[str, set] = {tile: set() for tile in tile_bits_no_mask}
+
+    active_frames: set[tuple[int, int]] = set()
+    tile_coord_re = re.compile(r"X(\d+)Y(\d+)")
 
     for line in canon_list:
         if not line.set_feature:
@@ -222,6 +230,9 @@ def _apply_fasm_features(
             )
         tile_loc = feature_parts[0]
         feature_name = ".".join((feature_parts[1], feature_parts[2]))
+
+        match = tile_coord_re.fullmatch(tile_loc)
+        col_idx = int(match.group(1)) if match else 0
 
         if tile_loc not in spec_dict["TileMap"]:
             raise SpecMissMatch(
@@ -263,6 +274,10 @@ def _apply_fasm_features(
                         )
                     touched_bits[tile_loc].add(bit_idx)
                     tile_bits[tile_loc][bit_idx] = new_val
+
+                    frame_idx = bit_idx // bitstream_format.frame_bits_per_row
+                    active_frames.add((col_idx, frame_idx))
+
                 if tile_loc not in spec_dict["TileSpecs_No_Mask"]:
                     raise SpecMissMatch(
                         f"Tile location '{tile_loc}' not found in TileSpecs_No_Mask"
@@ -284,6 +299,9 @@ def _apply_fasm_features(
                         )
                     touched_bits_no_mask[tile_loc].add(bit_idx)
                     tile_bits_no_mask[tile_loc][bit_idx] = new_val
+
+                    frame_idx = bit_idx // bitstream_format.frame_bits_per_row
+                    active_frames.add((col_idx, frame_idx))
         else:
             tile_type = spec_dict["TileMap"][tile_loc]
             raise SpecMissMatch(
@@ -292,6 +310,7 @@ def _apply_fasm_features(
                 f"Feature: {feature_name}\n"
                 "found in fasm file was not found in the bitstream spec"
             )
+    return active_frames
 
 
 def _compute_grid_size(tile_bits: dict[str, list[int]]) -> tuple[int, int]:
@@ -472,6 +491,8 @@ def _build_binary_bitstream(
     bit_array: list[list[bytes]],
     num_columns: int,
     bitstream_format: BitstreamFormat,
+    active_frames: set[tuple[int, int]],
+    write_all_frames: bool
 ) -> bytes:
     """Assemble binary bitstream: sync header + frame-select/data pairs + desync frame.
 
@@ -495,6 +516,8 @@ def _build_binary_bitstream(
     # Add one (frame-select word + frame data) pair per frame per column.
     for col in range(num_columns):
         for frame_idx, frame_data in enumerate(bit_array[col]):
+            if not write_all_frames and (col, frame_idx) not in active_frames:
+                continue
             # Frame-select word: column in top bits (address),
             # frame as one-hot bit (select).
             frame_select_word = (
@@ -518,7 +541,12 @@ def _build_binary_bitstream(
     return bitstream
 
 
-def gen_bitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
+def gen_bitstream(
+    fasm_file: str,
+    spec_file: str,
+    bitstream_file: str,
+    write_all_frames: bool = False
+) -> None:
     """Generate bitstream outputs (.csv, .vh, .vhd, .bin) from a FASM file and spec.
 
     Parameters
@@ -555,9 +583,19 @@ def gen_bitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     tile_bits = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
     tile_bits_no_mask = {tile: [0] * total_bits for tile in spec_dict["TileMap"]}
 
-    _apply_fasm_features(
+    active_frames = _apply_fasm_features(
         canon_list, spec_dict, tile_bits, tile_bits_no_mask, bitstream_format
     )
+
+    if write_all_frames:
+        logger.info("Writing ALL frames to bitstream (including untouched ones).")
+    else:
+        logger.info(f"Total active (touched) frames to be written: {len(active_frames)}")
+        touched_by_col = {}
+        for col, frame in sorted(active_frames):
+            touched_by_col.setdefault(col, []).append(frame)
+        for col, frames in touched_by_col.items():
+            logger.info(f"  Column {col} active frames: {frames}")
 
     num_columns, num_rows = _compute_grid_size(tile_bits)
     max_addressable_columns = 2**bitstream_format.frame_select_width
@@ -571,19 +609,21 @@ def gen_bitstream(fasm_file: str, spec_file: str, bitstream_file: str) -> None:
     verilog_str, vhdl_str = _build_hdl_strings(
         tile_bits_no_mask,
         spec_dict,
-        bitstream_format,
+        bitstream_format
     )
     csv_str, bit_array = _build_csv_and_frame_data(
         tile_bits,
         spec_dict,
         num_rows,
         num_columns,
-        bitstream_format,
+        bitstream_format
     )
     bitstream_bytes = _build_binary_bitstream(
         bit_array,
         num_columns,
         bitstream_format,
+        active_frames,
+        write_all_frames
     )
 
     output_path = Path(bitstream_file)
@@ -647,11 +687,16 @@ def bit_gen() -> None:
     gen_parser.add_argument(
         "output_file", help="Path to write the output bitstream (.bin)"
     )
+    gen_parser.add_argument(
+        "--write-all",
+        action="store_true",
+        help="Force writing all frames to the bitstream, including untouched all-zero frames.",
+    )
 
     args = parser.parse_args()
 
     if args.command == "genBitstream":
-        gen_bitstream(args.fasm_file, args.spec_file, args.output_file)
+        gen_bitstream(args.fasm_file, args.spec_file, args.output_file, args.write_all)
     else:
         parser.print_help()
 
