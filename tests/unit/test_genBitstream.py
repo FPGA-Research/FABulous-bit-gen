@@ -752,7 +752,8 @@ class TestGenBitstreamVersionCompat:
     def _spec_with_iomux(self, base: dict, version: str) -> dict:
         """Spec using old IOmux naming (capital-O) for the given version.
 
-        FASM feature 'X0Y1.A.I0mux' → feature_name 'A.I0mux'; old spec stores 'A.IOmux'.
+        FASM feature 'X0Y1.A.I0mux' -> feature_name 'A.I0mux'; old spec stores
+        'A.IOmux'.
         """
         spec = copy.deepcopy(base)
         spec["FABulousVersion"] = version
@@ -786,29 +787,41 @@ class TestGenBitstreamVersionCompat:
             "fabulous_bit_gen.bit_gen.set_feature_to_str",
             side_effect=lambda f: f.feature,
         )
+        mock_logger = mocker.patch("fabulous_bit_gen.bit_gen.logger")
         gen_bitstream(str(fasm_file), str(spec_file), str(output_file))
+        return mock_logger
 
-    @pytest.mark.parametrize("version", ["1.0", "2.0b", "2.0b1"])
-    def test_i0mux_remapped_to_iomux_for_old_version(
+    @pytest.mark.parametrize("version", ["1.0", "2.0b", "2.0", "2.1", "3.0"])
+    def test_i0mux_remapped_to_iomux_for_any_version(
         self, version, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
-        """I0mux in FASM should match IOmux in spec for old FABulousVersions."""
-        self._run(
+        """New nextpnr I0mux matches an old-template IOmux spec at any version."""
+        mock_logger = self._run(
             "X0Y1.A.I0mux",
             self._spec_with_iomux(minimal_spec_dict, version),
             temp_output_dir,
             mocker,
         )
+        mock_logger.warning.assert_called_once()
+        assert "might need an update" in mock_logger.warning.call_args[0][0]
 
-    @pytest.mark.parametrize("version", ["2.0", "2.1", "3.0"])
-    def test_i0mux_not_remapped_for_new_version(
-        self, version, minimal_spec_dict, temp_output_dir, mocker
+    def test_iomux_remapped_to_i0mux(
+        self, minimal_spec_dict, temp_output_dir, mocker
     ) -> None:
-        """I0mux in FASM should NOT fall back to IOmux for versions >= 2.0."""
+        """Old nextpnr IOmux matches a new-template I0mux spec."""
+        spec = self._spec_with_iomux(minimal_spec_dict, "2.0")
+        spec["TileSpecs"]["X0Y1"] = {"A.I0mux": {10: "1"}}
+        spec["TileSpecs_No_Mask"]["X0Y1"] = {"A.I0mux": {10: "1"}}
+        self._run("X0Y1.A.IOmux", spec, temp_output_dir, mocker)
+
+    def test_unrelated_feature_not_remapped(
+        self, minimal_spec_dict, temp_output_dir, mocker
+    ) -> None:
+        """Only the carry mux bit is aliased; other misses still raise."""
         with pytest.raises(SpecMissMatch):
             self._run(
-                "X0Y1.A.I0mux",
-                self._spec_with_iomux(minimal_spec_dict, version),
+                "X0Y1.B.I0mux",
+                self._spec_with_iomux(minimal_spec_dict, "2.0"),
                 temp_output_dir,
                 mocker,
             )
@@ -2473,7 +2486,7 @@ class TestGenBitstreamBinaryOutput:
         assert content.startswith(bytes.fromhex("A1B2C3D4"))
         assert content.endswith((1 << 7).to_bytes(2, byteorder="big"))
         # 4-byte header + (2 cols * 1 frame * (2-byte frame-select + 2-byte data))
-        # + 2-byte desync frame (FrameBitsPerRow=16 → word_bytes=2).
+        # + 2-byte desync frame (FrameBitsPerRow=16 -> word_bytes=2).
         assert len(content) == 4 + (2 * 1 * (2 + 2)) + 2
 
 
