@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/FPGA-Research/FABulous-bit-gen/compare/v0.3.1...v0.4.0) (2026-10-30)
+
+
+### Features
+
+* add -V for showing version ([#15](https://github.com/FPGA-Research/FABulous-bit-gen/issues/15)) ([e5f0f41](https://github.com/FPGA-Research/FABulous-bit-gen/commit/e5f0f41c0d89da4c6162992037d79f4e52a11d67))
+* add MultiClkDomains spec flag to keep CLK features ([#17](https://github.com/FPGA-Research/FABulous-bit-gen/issues/17)) ([ea06a3d](https://github.com/FPGA-Research/FABulous-bit-gen/commit/ea06a3dd577ea7f4451f0b2236c439bed89fee38))
+
+
+### Bug Fixes
+
+* remap I0mux/IOmux both ways regardless of version ([#19](https://github.com/FPGA-Research/FABulous-bit-gen/issues/19)) ([8e689f6](https://github.com/FPGA-Research/FABulous-bit-gen/commit/8e689f61c8c5010ce8363729f537d795d53cf355))
+
 ## [0.3.1](https://github.com/FPGA-Research/FABulous-bit-gen/compare/v0.3.0...v0.3.1) (2026-07-03)
 
 
